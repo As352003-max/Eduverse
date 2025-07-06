@@ -40,10 +40,10 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Allow your frontend to access
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173', 
     credentials: true,
 }));
-app.use(express.json()); // Body parser for JSON data
+app.use(express.json()); 
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
