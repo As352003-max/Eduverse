@@ -28,9 +28,9 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   register: (
-    email: string,
-    password: string,
-    username: string,
+  username: string,
+  email: string,
+  password: string,
     role: string,
     grade?: number,
     parent_id?: string
