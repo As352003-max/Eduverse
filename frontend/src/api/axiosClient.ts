@@ -4,7 +4,7 @@ import localforage from 'localforage';
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
-const API_URL = `${import.meta.env.VITE_BASE_API}/api` || 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_BASE_API ? `${import.meta.env.VITE_BASE_API}/api` : 'http://localhost:5000/api');
 
 const axiosClient = axios.create({
   baseURL: API_URL,
