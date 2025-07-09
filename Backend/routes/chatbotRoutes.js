@@ -27,7 +27,7 @@ router.post('/message', protect, async (req, res) => {
             session = new ChatSession({ userId, history: [] });
         }
 
-        // Clean history to avoid sending _id to Gemini
+        // Remove _id from parts to satisfy Gemini API
         const chatHistoryForGemini = session.history.map(msg => ({
             role: msg.role,
             parts: msg.parts.map(p => ({ text: p.text }))
@@ -42,6 +42,7 @@ router.post('/message', protect, async (req, res) => {
         const result = await chat.sendMessage(message);
         const responseText = result.response.text();
 
+        // Save new messages
         session.history.push({ role: 'user', parts: [{ text: message }] });
         session.history.push({ role: 'model', parts: [{ text: responseText }] });
         session.lastActive = Date.now();
@@ -89,6 +90,24 @@ router.get('/sessions', protect, async (req, res) => {
     }
 });
 
+// GET /api/chatbot/session/:sessionId — fetch a single chat session by ID
+router.get('/session/:sessionId', protect, async (req, res) => {
+    const { sessionId } = req.params;
+
+    try {
+        const session = await ChatSession.findOne({ _id: sessionId, userId: req.user.id });
+
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found or unauthorized.' });
+        }
+
+        res.status(200).json(session);
+    } catch (err) {
+        console.error('Error fetching session by ID:', err);
+        res.status(500).json({ message: 'Failed to fetch chat session.', error: err.message });
+    }
+});
+
 // POST /api/chatbot/new-session — create a new session
 router.post('/new-session', protect, async (req, res) => {
     const { title } = req.body;
@@ -133,3 +152,4 @@ router.put('/session/:sessionId/rename', protect, async (req, res) => {
 });
 
 module.exports = router;
+g
