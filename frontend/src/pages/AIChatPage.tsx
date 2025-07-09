@@ -1,9 +1,10 @@
+// frontend/src/pages/AIChatPage.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon, UserCircleIcon, ArrowPathIcon, ExclamationCircleIcon, HandRaisedIcon } from '@heroicons/react/24/outline';
-import { ChatMessage, ChatSession } from '../types';
+import { ChatMessage, ChatSession } from '../types'; // Import types
 
 const AIChatPage: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -15,6 +16,7 @@ const AIChatPage: React.FC = () => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Scroll to bottom of chat
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -29,14 +31,16 @@ const AIChatPage: React.FC = () => {
             return;
         }
 
+        // Optional: Fetch previous session history if available
         const fetchSessionHistory = async () => {
-            if (user && currentSessionId) {
+            if (user && currentSessionId) { // Only fetch if user and session ID are known
                 setLoadingAI(true);
                 try {
                     const response = await apiClient.get<ChatSession>(`/chatbot/session/${currentSessionId}`);
                     setMessages(response.data.history);
                 } catch (err: any) {
                     console.error('Error fetching chat session history:', err.response?.data || err.message);
+                    // If session not found, just start a new one
                     setCurrentSessionId(null);
                     setMessages([]);
                 } finally {
@@ -46,7 +50,7 @@ const AIChatPage: React.FC = () => {
         };
 
         fetchSessionHistory();
-    }, [user, authLoading, currentSessionId]);
+    }, [user, authLoading, currentSessionId]); // Re-fetch if user or session changes
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,8 +73,8 @@ const AIChatPage: React.FC = () => {
             }
 
             const response = await apiClient.post<{ response: string; sessionId: string; history: ChatMessage[] }>('/chatbot/message', payload);
-            setCurrentSessionId(response.data.sessionId);
-            setMessages(response.data.history);
+            setCurrentSessionId(response.data.sessionId); // Update session ID
+            setMessages(response.data.history); // Use the history returned by the backend for consistency
         } catch (err: any) {
             console.error('Error sending message to AI:', err.response?.data || err.message);
             setError('Failed to get AI response. Please try again.');
