@@ -1,32 +1,52 @@
 // backend/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User'); // Import the User model
-const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Import auth middleware
+const User = require('../models/User'); // Import your User model
+const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Import your auth middleware
 
-// @route   GET /api/users/:id
-// @desc    Get user profile by ID
-// @access  Private (User can view their own, Admin/Teacher can view any)
-router.get('/:id', protect, async (req, res) => {
+// @route   GET /api/users/profile
+// @desc    Get the profile of the currently authenticated user
+// @access  Private
+router.get('/profile', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.params.id).select('-password'); // Exclude password
+        // req.user is populated by the 'protect' middleware
+        // We select specific fields to return, excluding sensitive ones like password
+        const user = await User.findById(req.user._id).select('-password');
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+        if (user) {
+            res.status(200).json({
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                totalXp: user.totalXp,
+                currentLevel: user.currentLevel,
+                badges: user.badges,
+                // Add any other user profile fields you want to expose
+            });
+        } else {
+            res.status(404).json({ message: 'User not found.' });
         }
-
-        // Authorization: User can view their own profile, or admin/teacher can view any
-        if (req.user.id.toString() !== user._id.toString() && !['admin', 'teacher'].includes(req.user.role)) {
-            return res.status(403).json({ message: 'Not authorized to view this profile.' });
-        }
-
-        res.status(200).json(user);
     } catch (error) {
-        console.error('Error fetching user profile:', error.message);
-        res.status(500).json({ message: 'Server error fetching user profile.' });
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ message: 'Server error fetching user profile.', error: error.message });
     }
 });
 
-// You can add more user-related routes here, e.g., update user profile, get all users (for admin)
+// Example of an admin-only route (if you need one)
+// @route   GET /api/users/all
+// @desc    Get all users (Admin only)
+// @access  Private/Admin
+router.get('/all', protect, authorizeRoles('admin'), async (req, res) => {
+    try {
+        const users = await User.find({}).select('-password'); // Fetch all users, exclude passwords
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Error fetching all users:', error);
+        res.status(500).json({ message: 'Server error fetching all users.', error: error.message });
+    }
+});
+
 
 module.exports = router;
+
