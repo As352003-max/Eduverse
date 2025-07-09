@@ -1,14 +1,15 @@
+// frontend/src/pages/RegisterPage.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'framer-motion';
-import { UserIcon, EnvelopeIcon, LockClosedIcon, ArrowPathIcon, ExclamationCircleIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion'; // For animations
+import { UserIcon, EnvelopeIcon, LockClosedIcon, ArrowPathIcon, ExclamationCircleIcon, AcademicCapIcon } from '@heroicons/react/24/outline'; // Icons
 
 const RegisterPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'student' | 'teacher' | 'parent'>('student');
+    const [role, setRole] = useState<'student' | 'teacher' | 'parent'>('student'); // Default role
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
@@ -19,9 +20,11 @@ const RegisterPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            await register(username, email, password, role);
-            navigate('/dashboard');
+            // IMPORTANT: Trim whitespace from username, email, and password before sending
+            await register(username.trim(), email.trim(), password.trim(), role);
+            navigate('/dashboard'); // Redirect to dashboard on successful registration
         } catch (err: any) {
+            console.error('Registration failed:', err.response?.data || err.message);
             setError(err.response?.data?.message || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
