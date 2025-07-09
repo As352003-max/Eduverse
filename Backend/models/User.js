@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    // IMPORTANT FIX: Password is required only if authType is 'email_password'
     password: {
         type: String,
         required: function() {
@@ -12,22 +11,21 @@ const userSchema = new mongoose.Schema({
         },
         minlength: 6
     },
-    firebaseId: { type: String, unique: true, sparse: true }, // New field for Firebase UID
+    firebaseId: { type: String, unique: true, sparse: true },
     authType: {
         type: String,
         enum: ['email_password', 'firebase'],
-        default: 'email_password' // Default to email/password auth
+        default: 'email_password'
     },
     role: { type: String, enum: ['student', 'teacher', 'parent', 'admin'], default: 'student' },
-    grade: { type: Number, min: 5, max: 10 }, // For students
-    parent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For students to link to parents
+    grade: { type: Number, min: 5, max: 10 },
+    parent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     totalXp: { type: Number, default: 0 },
-    badges: [{ type: String }], // Array of badge names or IDs
-    currentLevel: { type: Number, default: 1 }, // Added currentLevel
+    badges: [{ type: String }],
+    currentLevel: { type: Number, default: 1 },
     lastLogin: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-// Hash password before saving (only for email_password users)
 userSchema.pre('save', async function (next) {
     if (this.isModified('password') && this.authType === 'email_password') {
         const salt = await bcrypt.genSalt(10);
@@ -36,9 +34,8 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
-// Method to compare entered password with hashed password (for traditional login)
 userSchema.methods.matchPassword = async function (enteredPassword) {
-    if (!this.password) { // If user has no password (e.g., Firebase user)
+    if (!this.password) {
         return false;
     }
     return await bcrypt.compare(enteredPassword, this.password);

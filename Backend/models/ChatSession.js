@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
 const chatMessageSchema = new mongoose.Schema({
-    role: { // 'user' or 'model'
+    role: {
         type: String,
         required: true,
         enum: ['user', 'model'],
     },
-    parts: [{ // Array of text parts, compatible with Gemini API structure
+    parts: [{
         text: {
             type: String,
             required: true,
@@ -24,14 +24,21 @@ const chatSessionSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    history: [chatMessageSchema], // Array of messages in the conversation
+    title: {
+        type: String,
+        default: 'Untitled Session',
+    },
+    history: [chatMessageSchema],
     lastActive: {
         type: Date,
         default: Date.now,
     },
 }, { timestamps: true });
 
-// Ensure unique session per user
-chatSessionSchema.index({ userId: 1 }, { unique: true });
+// Removed the unique index so users can have multiple sessions
+
+
+// Optional: only if you want to enforce one session per user
+// chatSessionSchema.index({ userId: 1 }, { unique: true });
 
 module.exports = mongoose.model('ChatSession', chatSessionSchema);

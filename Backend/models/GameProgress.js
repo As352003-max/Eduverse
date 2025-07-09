@@ -12,14 +12,13 @@ const gameProgressSchema = new mongoose.Schema({
         ref: 'Module',
         required: true,
     },
-    progress: { // Percentage completion of the module/game
+    progress: {
         type: Number,
-        required: true,
+        default: 0,
         min: 0,
         max: 100,
-        default: 0,
     },
-    score: { // Score achieved in the game/quiz
+    score: {
         type: Number,
         default: 0,
     },
@@ -35,8 +34,9 @@ const gameProgressSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    customData: { // Flexible field for game-specific data (e.g., quiz answers, puzzle state)
+    customData: {
         type: mongoose.Schema.Types.Mixed,
+        default: {},
     },
     lastAttemptedAt: {
         type: Date,
@@ -44,7 +44,6 @@ const gameProgressSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
-// Ensure unique combination of userId and moduleId
 gameProgressSchema.index({ userId: 1, moduleId: 1 }, { unique: true });
 
 module.exports = mongoose.model('GameProgress', gameProgressSchema);
