@@ -4,7 +4,9 @@ import localforage from 'localforage';
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
-const API_URL = (import.meta.env.VITE_BASE_API ? `${import.meta.env.VITE_BASE_API}/api` : 'http://localhost:5000/api');
+const API_URL = import.meta.env.VITE_BASE_API
+  ? `${import.meta.env.VITE_BASE_API}/api`
+  : 'http://localhost:5000/api';
 
 const axiosClient = axios.create({
   baseURL: API_URL,
@@ -13,25 +15,29 @@ const axiosClient = axios.create({
   },
 });
 
+// 🛡️ Request Interceptor: Add Bearer token from localforage
 axiosClient.interceptors.request.use(
   async (config) => {
     try {
       const token = await localforage.getItem<string>('userToken');
-      if (token) {
+      if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error('Token retrieval error:', error);
+      console.error('Error retrieving token from localforage:', error);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
+// 🔁 Response Interceptor: Refresh token on 401 errors
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Prevent infinite retry loop
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -41,7 +47,7 @@ axiosClient.interceptors.response.use(
           const idToken = await currentUser.getIdToken(true);
 
           const res = await axios.post(`${API_URL}/auth/firebase-auth`, {
-            token: idToken, // ✅ send as 'token' not 'idToken'
+            token: idToken, // 🔐 server expects { token }
           });
 
           const newToken = res.data.token;
@@ -50,10 +56,11 @@ axiosClient.interceptors.response.use(
           axiosClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
           originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
 
-          return axiosClient(originalRequest);
+          return axiosClient(originalRequest); // 🔁 retry with refreshed token
         }
       } catch (refreshError: any) {
         console.error('Token refresh failed:', refreshError.response?.data || refreshError.message);
+
         await localforage.removeItem('userToken');
         await signOut(auth);
 
@@ -62,6 +69,7 @@ axiosClient.interceptors.response.use(
         }
       }
     }
+
     return Promise.reject(error);
   }
 );
