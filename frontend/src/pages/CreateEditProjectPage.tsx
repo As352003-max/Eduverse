@@ -1,34 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '../api/axiosClient';
-import { useAuth } from '../context/AuthContext';
-import { XMarkIcon, DocumentTextIcon, CalendarDaysIcon, UserIcon, CheckCircleIcon, PlusCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import apiClient from '../api/axiosClient'; // Your API client
+import { useAuth } from '../context/AuthContext'; // To get user ID for project owner
+import { XMarkIcon, DocumentTextIcon, CalendarDaysIcon, UserIcon, CheckCircleIcon, PlusCircleIcon, PencilSquareIcon, ArrowPathIcon } from '@heroicons/react/24/outline'; // Icons - Added ArrowPathIcon
 
+// Define interfaces for props and project data
 interface Project {
-    _id?: string;
+    _id?: string; // Optional for creation, required for editing
     title: string;
     description: string;
-    owner?: { _id: string; username: string; };
+    owner?: { _id: string; username: string; }; // Owner might be populated or just ID
     status: 'pending' | 'in-progress' | 'completed' | 'reviewed';
     dueDate?: string;
 }
 
 interface CreateEditProjectPageProps {
-    projectToEdit?: Project | null;
-    onClose: () => void;
+    projectToEdit?: Project | null; // Optional prop for editing existing project
+    onClose: () => void; // Function to close the modal
 }
 
 const CreateEditProjectPage: React.FC<CreateEditProjectPageProps> = ({ projectToEdit, onClose }) => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth(); // Get current user from AuthContext
+    const navigate = useNavigate(); // Not directly used for modal, but good to have for page navigation if needed
     const [title, setTitle] = useState(projectToEdit?.title || '');
     const [description, setDescription] = useState(projectToEdit?.description || '');
     const [status, setStatus] = useState<'pending' | 'in-progress' | 'completed' | 'reviewed'>(projectToEdit?.status || 'pending');
-    const [dueDate, setDueDate] = useState(projectToEdit?.dueDate ? new Date(projectToEdit.dueDate).toISOString().split('T')[0] : '');
+    const [dueDate, setDueDate] = useState(projectToEdit?.dueDate ? new Date(projectToEdit.dueDate).toISOString().split('T')[0] : ''); // Format for input type="date"
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+    // Populate form fields if a projectToEdit is provided
     useEffect(() => {
         if (projectToEdit) {
             setTitle(projectToEdit.title);
@@ -36,6 +38,7 @@ const CreateEditProjectPage: React.FC<CreateEditProjectPageProps> = ({ projectTo
             setStatus(projectToEdit.status);
             setDueDate(projectToEdit.dueDate ? new Date(projectToEdit.dueDate).toISOString().split('T')[0] : '');
         } else {
+            // Reset form for new project creation
             setTitle('');
             setDescription('');
             setStatus('pending');
@@ -59,18 +62,21 @@ const CreateEditProjectPage: React.FC<CreateEditProjectPageProps> = ({ projectTo
             title,
             description,
             status,
-            dueDate: dueDate || undefined,
-            owner: user._id
+            dueDate: dueDate || undefined, // Send as undefined if empty
+            owner: user._id // Assign current user as owner
         };
 
         try {
             if (projectToEdit?._id) {
+                // Update existing project
                 await apiClient.put(`/projects/${projectToEdit._id}`, projectData);
                 setSuccessMessage('Project updated successfully!');
             } else {
+                // Create new project
                 await apiClient.post('/projects', projectData);
                 setSuccessMessage('Project created successfully!');
             }
+            // Close modal after a short delay to show success message
             setTimeout(() => {
                 onClose();
             }, 1500);
