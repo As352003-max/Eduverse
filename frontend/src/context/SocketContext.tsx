@@ -1,47 +1,65 @@
-// frontend/src/context/SocketContext.tsx
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
-import { useAuth } from './AuthContext'; // To get user ID for joining rooms
-import { toast } from 'react-toastify'; // For notifications, you'll need to install this
-import 'react-toastify/dist/ReactToastify.css'; // And its CSS
+import { useAuth } from './AuthContext';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface SocketContextType {
     socket: Socket | null;
     isConnected: boolean;
 }
 
+interface AchievementPayload {
+    type: 'levelUp' | 'badge';
+    name?: string;
+    newLevel?: number;
+    description?: string;
+    message: string;
+}
+
+interface LeaderboardUpdatePayload {
+    message?: string;
+}
+
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
-// Backend URL for Socket.IO connection
 const SOCKET_SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
     const { user, loading: authLoading } = useAuth();
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        // Only attempt to connect if auth is loaded and a user is present
-        if (!authLoading && user) {
+        if (!authLoading && user && !socketRef.current) {
+            const token = localStorage.getItem('token');
+
             const newSocket = io(SOCKET_SERVER_URL, {
-                withCredentials: true, // Important for CORS and session cookies if used
-                transports: ['websocket', 'polling'], // Ensure compatibility
+                query: { userId: user._id },
+                auth: { token: token },
+                transports: ['websocket', 'polling'],
             });
 
             newSocket.on('connect', () => {
                 setIsConnected(true);
                 console.log('Socket.IO connected:', newSocket.id);
-                // Join a user-specific room for private notifications
-                newSocket.emit('joinUserRoom', user._id);
+                if (user && newSocket.connected) {
+                    newSocket.emit('joinUserRoom', user._id);
+                }
             });
 
-            newSocket.on('disconnect', () => {
+            newSocket.on('disconnect', (reason) => {
                 setIsConnected(false);
-                console.log('Socket.IO disconnected');
+                console.log('Socket.IO disconnected:', reason);
             });
 
-            // Listen for gamification notifications
-            newSocket.on('achievementUnlocked', (data: { type: string; name?: string; newLevel?: number; description?: string; message: string }) => {
+            newSocket.on('connect_error', (error) => {
+                console.error('Socket.IO connection error:', error.message);
+                toast.error(`Socket connection error: ${error.message}`, { autoClose: 7000 });
+            });
+
+            newSocket.on('achievementUnlocked', (data: AchievementPayload) => {
                 console.log('Achievement Unlocked:', data);
                 if (data.type === 'levelUp') {
                     toast.success(data.message, { autoClose: 5000 });
@@ -50,31 +68,38 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
                 }
             });
 
-            newSocket.on('leaderboardUpdate', (data: any) => {
+            newSocket.on('leaderboardUpdate', (data: LeaderboardUpdatePayload) => {
                 console.log('Leaderboard Updated:', data);
-                // You might want to trigger a re-fetch of the leaderboard on the LeaderboardPage
-                // Or update a global state if you have one
-                toast.success('Leaderboard has been updated!', { autoClose: 3000 });
+                toast.success(data.message || 'Leaderboard has been updated!', { autoClose: 3000 });
             });
 
-            // Add other real-time listeners here (e.g., chat messages, project updates)
-
             setSocket(newSocket);
+            socketRef.current = newSocket;
 
-            return () => {
-                newSocket.off('connect');
-                newSocket.off('disconnect');
-                newSocket.off('achievementUnlocked');
-                newSocket.off('leaderboardUpdate');
-                newSocket.disconnect();
-            };
-        } else if (!authLoading && !user && socket) {
-            // If user logs out, disconnect socket
-            socket.disconnect();
+        } else if (!authLoading && !user && socketRef.current) {
+            socketRef.current.off('connect');
+            socketRef.current.off('disconnect');
+            socketRef.current.off('connect_error');
+            socketRef.current.off('achievementUnlocked');
+            socketRef.current.off('leaderboardUpdate');
+            socketRef.current.disconnect();
+            socketRef.current = null;
             setSocket(null);
             setIsConnected(false);
         }
-    }, [user, authLoading]); // Re-run when user or authLoading changes
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.off('connect');
+                socketRef.current.off('disconnect');
+                socketRef.current.off('connect_error');
+                socketRef.current.off('achievementUnlocked');
+                socketRef.current.off('leaderboardUpdate');
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, [user, authLoading]);
 
     return (
         <SocketContext.Provider value={{ socket, isConnected }}>

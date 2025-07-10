@@ -1,11 +1,10 @@
-// frontend/src/App.tsx
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Navbar from './components/Navbar';
+import NotificationToasts from './components/NotificationToasts';
 
-// Pages
 import AuthLoadingPage from './pages/AuthLoadingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -16,13 +15,14 @@ import ModuleDetailPage from './pages/ModuleDetailPage';
 import GamePage from './pages/GamePage';
 import AIChatPage from './pages/AIChatPage';
 import ProjectsPage from './pages/ProjectsPage';
-import CreateEditProjectPage from './pages/CreateEditProjectPage'; // ✅ No props needed
+import CreateEditProjectPage from './pages/CreateEditProjectPage';
 import ProjectDetailPage from './pages/ProjectDetailsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import UserProfilePage from './pages/UserProfilePage';
 import StudentProgressDetailPage from './pages/StudentProgressDetailPage';
+import TeacherDashboardPage from './pages/TeacherDashboardPage';
+import MyChildrenPage from './pages/MyChildrenPage'; // Import the new MyChildrenPage
 
-// 🔒 PrivateRoute wrapper
 const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
     const { user, loading } = useAuth();
 
@@ -35,7 +35,6 @@ const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }>
     return children;
 };
 
-// 🌐 AppContent controls initial redirection and main routes
 const AppContent: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
@@ -59,16 +58,28 @@ const AppContent: React.FC = () => {
     return (
         <SocketProvider>
             <Navbar />
+            <NotificationToasts />
             <Routes>
-                {/* Public Routes */}
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
 
-                {/* Protected Routes */}
                 <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute allowedRoles={['student', 'teacher', 'parent', 'admin']}><UserProfilePage /></PrivateRoute>} />
-                <Route path="/student-progress/:studentId" element={<PrivateRoute allowedRoles={['teacher', 'parent']}><StudentProgressDetailPage /></PrivateRoute>} />
+
+                <Route path="/dashboard/students" element={<PrivateRoute allowedRoles={['teacher', 'admin']}><TeacherDashboardPage /></PrivateRoute>} />
+
+                <Route path="/dashboard/students/:studentId" element={<PrivateRoute allowedRoles={['teacher', 'parent', 'admin']}><StudentProgressDetailPage /></PrivateRoute>} />
+
+                {/* New route for MyChildrenPage */}
+                <Route path="/children" element={<PrivateRoute allowedRoles={['parent', 'admin']}><MyChildrenPage /></PrivateRoute>} />
+                {/* Placeholder for individual child's dashboard, if different from StudentProgressDetailPage */}
+                {/* If a parent views their child's progress, they'd use StudentProgressDetailPage */}
+                {/* So, this route might not be strictly necessary if /dashboard/students/:studentId is sufficient */}
+                {/* If you need a unique dashboard specific to a child's login, you'd add it here */}
+                <Route path="/children/:childId/dashboard" element={<PrivateRoute allowedRoles={['parent', 'admin']}><StudentProgressDetailPage /></PrivateRoute>} />
+
+
                 <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} />
                 <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} />
                 <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
@@ -80,7 +91,6 @@ const AppContent: React.FC = () => {
                 <Route path="/leaderboard" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
                 <Route path="/admin" element={<PrivateRoute allowedRoles={['admin']}><div>Admin Dashboard Content</div></PrivateRoute>} />
 
-                {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </SocketProvider>

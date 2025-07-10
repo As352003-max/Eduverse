@@ -1,51 +1,83 @@
-// backend/routes/analyticsRoutes.js
+// Backend/routes/analyticsRoutes.js
 const express = require('express');
 const router = express.Router();
-const { protect, authorizeRoles } = require('../middleware/authMiddleware'); // Import auth middleware
+const mongoose = require('mongoose');
+const AnalyticsEvent = require('../models/AnalyticsEvent');
+const { protect } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const GameProgress = require('../models/GameProgress');
-const Module = require('../models/Module'); // Assuming you have a Module model
+const Module = require('../models/Module');
 
-// @route   GET /api/analytics/student/:userId
-// @desc    Get dashboard analytics data for a specific student
-// @access  Private (accessible by student themselves, their parent, or admin/teacher)
-router.get('/student/:userId', protect, async (req, res) => {
-    const { userId } = req.params;
-    const requestingUser = req.user; // User object from 'protect' middleware
+router.post('/event', protect, async (req, res) => {
+    const { eventName, eventData } = req.body;
+    const initiatedByUserId = req.user ? req.user._id : null;
 
-    // Authorization check:
-    // A user can view their own data OR
-    // A parent can view their child's data (if parent_id matches) OR
-    // An admin/teacher can view any student's data
-    if (
-        requestingUser.id.toString() !== userId && // Not viewing their own data
-        requestingUser.role !== 'admin' && // Not an admin
-        requestingUser.role !== 'teacher' && // Not a teacher
-        !(requestingUser.role === 'parent' && requestingUser._id.toString() === (await User.findById(userId))?.parent_id?.toString()) // Not a parent of this student
-    ) {
-        return res.status(403).json({ message: 'Not authorized to view this student\'s analytics.' });
+    const targetProfileType = eventData?.targetProfileType;
+    const targetProfileId = eventData?.targetProfileId;
+
+    if (!eventName) {
+        return res.status(400).json({ message: 'Event name is required.' });
     }
 
     try {
-        const student = await User.findById(userId).select('-password');
+        const newEvent = new AnalyticsEvent({
+            eventName,
+            profile: {
+                id: targetProfileId,
+                kind: targetProfileType || 'Anonymous'
+            },
+            eventData: eventData || {},
+            ipAddress: req.ip,
+            initiatedByUserId
+        });
+
+        await newEvent.save();
+        res.status(201).json({ message: 'Analytics event logged successfully.' });
+    } catch (error) {
+        console.error('Error logging analytics event:', error.message);
+        res.status(500).json({
+            message: 'Failed to log analytics event.',
+            error: process.env.NODE_ENV === 'production' ? null : error.message
+        });
+    }
+});
+
+router.get('/student/:userId', protect, async (req, res) => {
+    const { userId } = req.params;
+    const requestingUser = req.user;
+
+    try {
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ message: 'Invalid User ID format.' });
+        }
+
+        const student = await User.findById(userId).select('-password -parent_id');
 
         if (!student || student.role !== 'student') {
             return res.status(404).json({ message: 'Student not found or user is not a student.' });
         }
 
-        // Fetch game progress for the student
-        const studentProgress = await GameProgress.find({ userId: student._id });
+        const isAuthorized =
+            requestingUser.id.toString() === userId ||
+            requestingUser.role === 'admin' ||
+            requestingUser.role === 'teacher' ||
+            (requestingUser.role === 'parent' &&
+                student.parent_id &&
+                requestingUser._id.toString() === student.parent_id.toString());
 
-        // Calculate various metrics
+        if (!isAuthorized) {
+            return res.status(403).json({ message: 'Not authorized to view this student\'s analytics.' });
+        }
+
+        const studentProgress = await GameProgress.find({ userId: student._id });
         const totalModulesAttempted = studentProgress.length;
         const modulesCompleted = studentProgress.filter(p => p.completed).length;
-        const uniqueModules = await Module.countDocuments(); // Get total available modules
+        const totalAvailableModules = await Module.countDocuments();
 
         const completionRate = totalModulesAttempted > 0
             ? (modulesCompleted / totalModulesAttempted) * 100
             : 0;
 
-        // Example of recent activity (last 5 attempts)
         const recentActivity = studentProgress
             .sort((a, b) => new Date(b.lastAttemptedAt).getTime() - new Date(a.lastAttemptedAt).getTime())
             .slice(0, 5)
@@ -70,15 +102,17 @@ router.get('/student/:userId', protect, async (req, res) => {
                 totalModulesAttempted,
                 modulesCompleted,
                 completionRate: parseFloat(completionRate.toFixed(2)),
-                totalAvailableModules: uniqueModules,
+                totalAvailableModules,
                 recentActivity,
-                // You can add more analytics here, e.g., average score, time spent, etc.
             },
-            progressDetails: studentProgress // Optionally send full progress details
+            progressDetails: studentProgress
         });
 
     } catch (error) {
         console.error('Error fetching student analytics:', error);
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid User ID format.' });
+        }
         res.status(500).json({ message: 'Server error fetching student analytics.', error: error.message });
     }
 });

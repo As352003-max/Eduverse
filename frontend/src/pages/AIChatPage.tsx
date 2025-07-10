@@ -3,8 +3,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
-import { ChatBubbleLeftRightIcon, PaperAirplaneIcon, SparklesIcon, UserCircleIcon, ArrowPathIcon, ExclamationCircleIcon, HandRaisedIcon } from '@heroicons/react/24/outline';
-import { ChatMessage, ChatSession } from '../types'; // Import types
+import {
+    ChatBubbleLeftRightIcon,
+    PaperAirplaneIcon,
+    SparklesIcon,
+    UserCircleIcon,
+    ArrowPathIcon,
+    ExclamationCircleIcon,
+    HandRaisedIcon,
+    PlusIcon
+} from '@heroicons/react/24/outline';
+import { ChatMessage, ChatSession } from '../types';
 
 const AIChatPage: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -16,7 +25,6 @@ const AIChatPage: React.FC = () => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Scroll to bottom of chat
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -31,16 +39,14 @@ const AIChatPage: React.FC = () => {
             return;
         }
 
-        // Optional: Fetch previous session history if available
         const fetchSessionHistory = async () => {
-            if (user && currentSessionId) { // Only fetch if user and session ID are known
+            if (user && currentSessionId) {
                 setLoadingAI(true);
                 try {
                     const response = await apiClient.get<ChatSession>(`/chatbot/session/${currentSessionId}`);
                     setMessages(response.data.history);
                 } catch (err: any) {
                     console.error('Error fetching chat session history:', err.response?.data || err.message);
-                    // If session not found, just start a new one
                     setCurrentSessionId(null);
                     setMessages([]);
                 } finally {
@@ -50,7 +56,7 @@ const AIChatPage: React.FC = () => {
         };
 
         fetchSessionHistory();
-    }, [user, authLoading, currentSessionId]); // Re-fetch if user or session changes
+    }, [user, authLoading, currentSessionId]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,16 +79,19 @@ const AIChatPage: React.FC = () => {
             }
 
             const response = await apiClient.post<{ response: string; sessionId: string; history: ChatMessage[] }>('/chatbot/message', payload);
-            setCurrentSessionId(response.data.sessionId); // Update session ID
-            setMessages(response.data.history); // Use the history returned by the backend for consistency
+            setCurrentSessionId(response.data.sessionId);
+            setMessages(response.data.history);
         } catch (err: any) {
             console.error('Error sending message to AI:', err.response?.data || err.message);
             setError('Failed to get AI response. Please try again.');
-            setMessages(prev => [...prev, {
-                role: 'model',
-                parts: [{ text: 'Oops! I encountered an error. Please try again.' }],
-                timestamp: new Date().toISOString(),
-            }]);
+            setMessages(prev => [
+                ...prev,
+                {
+                    role: 'model',
+                    parts: [{ text: 'Oops! I encountered an error. Please try again.' }],
+                    timestamp: new Date().toISOString(),
+                },
+            ]);
         } finally {
             setLoadingAI(false);
         }
@@ -110,15 +119,31 @@ const AIChatPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 py-12 flex flex-col">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col flex-grow bg-white rounded-2xl shadow-lg overflow-hidden">
-                <motion.h1
+                <motion.div
                     initial={{ opacity: 0, y: -30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="text-3xl md:text-4xl font-extrabold text-gray-900 pt-8 pb-4 text-center border-b border-gray-200 flex items-center justify-center"
+                    className="flex items-center justify-between px-6 pt-8 pb-4 border-b border-gray-200"
                 >
-                    <ChatBubbleLeftRightIcon className="h-9 w-9 mr-4 text-purple-600" />
-                    AI Learning Assistant
-                </motion.h1>
+                    <div className="flex items-center">
+                        <ChatBubbleLeftRightIcon className="h-9 w-9 mr-4 text-purple-600" />
+                        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">
+                            AI Learning Assistant
+                        </h1>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setMessages([]);
+                            setCurrentSessionId(null);
+                            setInputMessage('');
+                        }}
+                        className="flex items-center px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-full hover:bg-indigo-600 transition shadow-md"
+                        title="Start New Chat"
+                    >
+                        <PlusIcon className="h-5 w-5 mr-1" />
+                        New Chat
+                    </button>
+                </motion.div>
 
                 {error && (
                     <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mt-4 mx-4 rounded-md" role="alert">

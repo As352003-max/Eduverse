@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PlayCircleIcon, PuzzlePieceIcon, RocketLaunchIcon, ArrowsRightLeftIcon, BookOpenIcon, CheckCircleIcon, ArrowLeftIcon, LightBulbIcon, SparklesIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline'; // Added ExclamationCircleIcon
-import { ModuleContentPiece, Module } from '../types'; 
+import { PlayCircleIcon, PuzzlePieceIcon, RocketLaunchIcon, ArrowsRightLeftIcon, BookOpenIcon, CheckCircleIcon as CheckCircleOutlineIcon, ArrowLeftIcon, LightBulbIcon, SparklesIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleSolidIcon } from '@heroicons/react/24/solid'; // For the solid checkmark
+import { ModuleContentPiece, Module } from '../types';
 import apiClient from '../api/axiosClient';
-import { useAuth } from '../context/AuthContext'; 
-import { toast } from 'react-toastify'; 
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface GamePageState {
     contentPiece: ModuleContentPiece;
@@ -16,7 +18,8 @@ const GamePage: React.FC = () => {
     const { moduleId, contentPieceIndex } = useParams<{ moduleId: string; contentPieceIndex: string }>();
     const location = useLocation();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, selectedChild } = useAuth();
+    const { trackEvent } = useAnalytics();
 
     const [gameContent, setGameContent] = useState<ModuleContentPiece | null>(null);
     const [currentModuleTitle, setCurrentModuleTitle] = useState<string>('');
@@ -25,18 +28,33 @@ const GamePage: React.FC = () => {
     const [quizFeedback, setQuizFeedback] = useState<string | null>(null);
     const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
     const [loadingProgressUpdate, setLoadingProgressUpdate] = useState<boolean>(false);
-    const [loadingGameContent, setLoadingGameContent] = useState<boolean>(true); // New loading state for game content
-    const [errorGameContent, setErrorGameContent] = useState<string | null>(null); // New error state for game content
+    const [loadingGameContent, setLoadingGameContent] = useState<boolean>(true);
+    const [errorGameContent, setErrorGameContent] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchGameData = async () => {
             setLoadingGameContent(true);
             setErrorGameContent(null);
+
+            if (!user) {
+                navigate('/login');
+                toast.error('Please log in to access games.');
+                return;
+            }
+
+            if (user.role === 'parent' && !selectedChild) {
+                toast.warn('Please select a child profile before starting a game.');
+                navigate('/children');
+                trackEvent('GAME_START_BLOCKED_NO_CHILD', {
+                    moduleId,
+                    contentIndex: contentPieceIndex
+                });
+                return;
+            }
+
             const state = location.state as GamePageState;
 
             if (state && state.contentPiece && state.moduleTitle) {
-                // Data available from location state
-                console.log("GamePage: Loading from location state.");
                 setGameContent(state.contentPiece);
                 setCurrentModuleTitle(state.moduleTitle);
                 setGameStatus('playing');
@@ -44,58 +62,108 @@ const GamePage: React.FC = () => {
                 setQuizFeedback(null);
                 setQuizSubmitted(false);
                 setLoadingGameContent(false);
+                trackEvent('ACTIVITY_STARTED', {
+                    moduleId: moduleId,
+                    moduleTitle: state.moduleTitle,
+                    activityType: state.contentPiece.type,
+                    contentIndex: contentPieceIndex,
+                    targetProfileType: selectedChild ? 'child' : 'user',
+                    targetProfileId: selectedChild ? selectedChild._id : user?._id
+                });
             } else if (moduleId && contentPieceIndex !== undefined) {
-                // Fallback: Fetch module data from backend if state is lost (e.g., page refresh)
-                console.log("GamePage: Location state missing, attempting fallback fetch.");
                 try {
                     const moduleRes = await apiClient.get<Module>(`/modules/${moduleId}`);
                     const module = moduleRes.data;
                     const index = parseInt(contentPieceIndex);
 
                     if (module && module.content && module.content[index]) {
-                        console.log("GamePage: Fallback fetch successful.");
                         setGameContent(module.content[index]);
                         setCurrentModuleTitle(module.title);
                         setGameStatus('playing');
                         setQuizAnswer('');
                         setQuizFeedback(null);
                         setQuizSubmitted(false);
+                        trackEvent('ACTIVITY_STARTED', {
+                            moduleId: moduleId,
+                            moduleTitle: module.title,
+                            activityType: module.content[index].type,
+                            contentIndex: contentPieceIndex,
+                            fallback: true,
+                            targetProfileType: selectedChild ? 'child' : 'user',
+                            targetProfileId: selectedChild ? selectedChild._id : user?._id
+                        });
                     } else {
                         const errorMessage = 'Game content not found within the module or invalid index.';
                         setErrorGameContent(errorMessage);
                         toast.error(errorMessage + " Returning to modules list.");
-                        navigate('/modules'); // Navigate to general modules if specific content is missing
+                        navigate('/modules');
+                        trackEvent('ACTIVITY_START_FAILED', {
+                            moduleId: moduleId,
+                            contentIndex: contentPieceIndex,
+                            reason: 'Content piece not found or invalid index',
+                            error: errorMessage,
+                            targetProfileType: selectedChild ? 'child' : 'user',
+                            targetProfileId: selectedChild ? selectedChild._id : user?._id
+                        });
                     }
                 } catch (err: any) {
                     const errorMessage = 'Failed to load game content from backend. ' + (err.response?.data?.message || err.message || 'Server error.');
-                    console.error('GamePage: Error fetching game content fallback:', errorMessage);
                     setErrorGameContent(errorMessage);
                     toast.error('Failed to load game content. Please try again.');
-                    navigate('/modules'); // Navigate to general modules on error
+                    navigate('/modules');
+                    trackEvent('ACTIVITY_START_FAILED', {
+                        moduleId: moduleId,
+                        contentIndex: contentPieceIndex,
+                        reason: 'Backend fetch failed',
+                        error: errorMessage,
+                        targetProfileType: selectedChild ? 'child' : 'user',
+                        targetProfileId: selectedChild ? selectedChild._id : user?._id
+                    });
                 } finally {
                     setLoadingGameContent(false);
                 }
             } else {
-                // Neither state nor URL params are sufficient
                 const errorMessage = 'Invalid game access. Please select a game from a module.';
                 setErrorGameContent(errorMessage);
                 toast.error(errorMessage + " Returning to modules.");
                 navigate('/modules');
                 setLoadingGameContent(false);
+                trackEvent('ACTIVITY_START_FAILED', {
+                    moduleId: moduleId,
+                    contentIndex: contentPieceIndex,
+                    reason: 'Invalid URL parameters or state',
+                    error: errorMessage,
+                    targetProfileType: selectedChild ? 'child' : 'user',
+                    targetProfileId: selectedChild ? selectedChild._id : user?._id
+                });
             }
         };
 
         fetchGameData();
-    }, [location.state, moduleId, contentPieceIndex, navigate]); // Dependencies for useEffect
+    }, [location.state, moduleId, contentPieceIndex, navigate, trackEvent, user, selectedChild]);
 
-    const handleGameCompletion = async (score: number, hintsUsed: number, completed: boolean = true) => {
-        if (!user || !moduleId) {
+    const handleGameCompletion = useCallback(async (score: number, hintsUsed: number, completed: boolean = true) => {
+        if (!user || !moduleId || !gameContent) {
             toast.error('Please log in to save game progress.');
+            trackEvent('ACTIVITY_COMPLETE_FAILED', {
+                moduleId: moduleId,
+                activityType: gameContent?.type,
+                contentIndex: contentPieceIndex,
+                reason: 'User not logged in or no game content',
+                score,
+                completed,
+                targetProfileType: selectedChild ? 'child' : 'user',
+                targetProfileId: selectedChild ? selectedChild._id : user?._id
+            });
             return;
         }
         setLoadingProgressUpdate(true);
+
+        const targetId = selectedChild ? selectedChild._id : user._id;
+        const updateEndpoint = selectedChild ? `/children/${targetId}/progress` : `/users/${targetId}/progress`;
+
         try {
-            const res = await apiClient.post('/games/progress', {
+            const res = await apiClient.post(updateEndpoint, {
                 moduleId: moduleId,
                 progress: completed ? 100 : 50,
                 score: score,
@@ -106,7 +174,6 @@ const GamePage: React.FC = () => {
                     contentIndex: contentPieceIndex,
                 },
             });
-            console.log('Game progress updated:', res.data);
             setGameStatus('completed');
             const gamification = res.data.gamification;
             let message = res.data.message || 'Progress Updated!';
@@ -120,13 +187,39 @@ const GamePage: React.FC = () => {
                 message += ` 🏆 New Badge: ${gamification.newBadges.join(', ')}!`;
             }
             toast.success(message, { autoClose: 5000 });
+
+            trackEvent('ACTIVITY_COMPLETED', {
+                moduleId: moduleId,
+                moduleTitle: currentModuleTitle,
+                activityType: gameContent.type,
+                contentIndex: contentPieceIndex,
+                score: score,
+                hintsUsed: hintsUsed,
+                isCompleted: completed,
+                xpGain: gamification.xpGain,
+                levelUp: gamification.levelUp,
+                newBadges: gamification.newBadges,
+                targetProfileType: selectedChild ? 'child' : 'user',
+                targetProfileId: targetId
+            });
+
         } catch (error: any) {
             console.error('Failed to update game progress:', error.response?.data || error.message);
             toast.error('Error saving game progress.');
+            trackEvent('ACTIVITY_COMPLETE_FAILED', {
+                moduleId: moduleId,
+                activityType: gameContent?.type,
+                contentIndex: contentPieceIndex,
+                score,
+                completed,
+                error: error.response?.data || error.message,
+                targetProfileType: selectedChild ? 'child' : 'user',
+                targetProfileId: targetId
+            });
         } finally {
             setLoadingProgressUpdate(false);
         }
-    };
+    }, [moduleId, contentPieceIndex, user, gameContent, currentModuleTitle, selectedChild, trackEvent]);
 
     const handleQuizSubmit = () => {
         if (gameContent?.type === 'quiz' && quizAnswer.trim() && !quizSubmitted) {
@@ -135,9 +228,28 @@ const GamePage: React.FC = () => {
             if (isCorrect) {
                 setQuizFeedback('Correct! 🎉');
                 handleGameCompletion(100, 0, true);
+                trackEvent('QUIZ_SUBMITTED', {
+                    moduleId: moduleId,
+                    contentIndex: contentPieceIndex,
+                    isCorrect: true,
+                    answer: quizAnswer.trim(),
+                    score: 100,
+                    targetProfileType: selectedChild ? 'child' : 'user',
+                    targetProfileId: selectedChild ? selectedChild._id : user?._id
+                });
             } else {
                 setQuizFeedback(`Incorrect. The correct answer was: "${gameContent.data.correctAnswer}"`);
                 handleGameCompletion(0, 0, false);
+                trackEvent('QUIZ_SUBMITTED', {
+                    moduleId: moduleId,
+                    contentIndex: contentPieceIndex,
+                    isCorrect: false,
+                    answer: quizAnswer.trim(),
+                    correctAnswer: gameContent.data.correctAnswer,
+                    score: 0,
+                    targetProfileType: selectedChild ? 'child' : 'user',
+                    targetProfileId: selectedChild ? selectedChild._id : user?._id
+                });
             }
         }
     };
@@ -147,6 +259,12 @@ const GamePage: React.FC = () => {
         setQuizFeedback(null);
         setQuizSubmitted(false);
         setGameStatus('playing');
+        trackEvent('QUIZ_RETRY', {
+            moduleId: moduleId,
+            contentIndex: contentPieceIndex,
+            targetProfileType: selectedChild ? 'child' : 'user',
+            targetProfileId: selectedChild ? selectedChild._id : user?._id
+        });
     };
 
     if (loadingGameContent) {
@@ -206,7 +324,12 @@ const GamePage: React.FC = () => {
                     <h1 className="text-3xl font-extrabold text-gray-900 text-center flex-grow">
                         {currentModuleTitle}
                     </h1>
-                    <div className="w-10"></div>
+                    <div className="text-sm text-gray-500 flex items-center">
+                        <span className="mr-1">Playing as:</span>
+                        <span className="font-semibold text-indigo-700">
+                            {selectedChild ? selectedChild.name : (user ? user.name || user.email : 'Guest')}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="text-center mb-8">
@@ -224,7 +347,7 @@ const GamePage: React.FC = () => {
                         transition={{ duration: 0.5 }}
                         className="bg-emerald-100 border-l-4 border-emerald-500 text-emerald-800 p-6 rounded-md text-center flex flex-col items-center"
                     >
-                        <CheckCircleIcon className="h-16 w-16 text-emerald-600 mb-4" />
+                        <CheckCircleSolidIcon className="h-16 w-16 text-emerald-600 mb-4" />
                         <h3 className="text-2xl font-bold mb-2">Activity Completed!</h3>
                         <p className="text-lg">Your progress has been saved.</p>
                         <button
@@ -340,16 +463,16 @@ const GamePage: React.FC = () => {
                                 <h3 className="text-xl font-semibold mb-3 flex items-center">
                                     <ArrowsRightLeftIcon className="h-6 w-6 mr-2 text-red-600" /> Drag-and-Drop: {gameContent.data.activityName}
                                 </h3>
-                                <p className="text-gray-700 mb-4">{gameContent.data.description || 'Engage in a drag-and-drop activity.'}</p>
+                                <p className="text-gray-700 mb-4">{gameContent.data.description}</p>
                                 <div className="bg-white border border-gray-300 p-8 rounded-lg shadow-inner text-center text-gray-500 italic h-48 flex items-center justify-center">
-                                    <p>This is where you would integrate your drag-and-drop component.</p>
+                                    <p>This is where you would integrate your interactive drag-and-drop component.</p>
                                 </div>
                                 <button
                                     onClick={() => handleGameCompletion(100, 0)}
                                     className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                                     disabled={loadingProgressUpdate}
                                 >
-                                    {loadingProgressUpdate ? 'Saving...' : 'Simulate Activity Completion'}
+                                    {loadingProgressUpdate ? 'Saving...' : 'Simulate Drag-and-Drop Complete'}
                                 </button>
                             </div>
                         )}

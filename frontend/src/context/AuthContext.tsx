@@ -1,6 +1,5 @@
-// frontend/src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth } from '../config/firebase'; // Your Firebase auth instance
+import { auth } from '../config/firebase';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -9,11 +8,15 @@ import {
     User as FirebaseUser,
     getIdToken,
 } from 'firebase/auth';
-import localforage from 'localforage'; // For client-side storage
-import apiClient from '../api/axiosClient'; // Your custom Axios client
-import { User } from '../types'; // Import your User type
+import localforage from 'localforage';
+import apiClient from '../api/axiosClient';
+import { User } from '../types';
 
-// Define the shape of the AuthContext
+interface SelectedChild {
+    _id: string;
+    name: string;
+}
+
 interface AuthContextType {
     user: User | null;
     firebaseUser: FirebaseUser | null;
@@ -22,36 +25,51 @@ interface AuthContextType {
     register: (username: string, email: string, password: string, role: 'student' | 'teacher' | 'parent') => Promise<void>;
     logout: () => Promise<void>;
     refreshAuthToken: () => Promise<string | null>;
+    selectedChild: SelectedChild | null;
+    setSelectedChild: (child: SelectedChild | null) => void;
 }
 
-// Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// AuthProvider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null); // Your backend user object
-    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null); // Firebase user object
-    const [loading, setLoading] = useState(true); // Initial loading state for auth
+    const [user, setUser] = useState<User | null>(null);
+    const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedChild, setSelectedChild] = useState<SelectedChild | null>(() => {
+        const savedChild = localStorage.getItem('selectedChild');
+        try {
+            return savedChild ? JSON.parse(savedChild) : null;
+        } catch (e) {
+            localStorage.removeItem('selectedChild');
+            return null;
+        }
+    });
 
-    // Function to fetch or refresh the custom token from your backend
+    useEffect(() => {
+        if (selectedChild) {
+            localStorage.setItem('selectedChild', JSON.stringify(selectedChild));
+        } else {
+            localStorage.removeItem('selectedChild');
+        }
+    }, [selectedChild]);
+
     const refreshAuthToken = async (): Promise<string | null> => {
         try {
-            const idToken = await firebaseUser?.getIdToken(true); // Force refresh
+            const idToken = await firebaseUser?.getIdToken(true);
             if (idToken) {
                 const res = await apiClient.post('/auth/firebase-auth', { token: idToken });
                 const backendToken = res.data.token;
                 await localforage.setItem('userToken', backendToken);
-                // Set the Authorization header for all subsequent requests
                 apiClient.defaults.headers.common['Authorization'] = `Bearer ${backendToken}`;
                 return backendToken;
             }
             return null;
         } catch (error) {
-            console.error('Failed to refresh custom auth token:', error);
             await localforage.removeItem('userToken');
-            await signOut(auth); // Sign out Firebase user on token refresh failure
+            await signOut(auth);
             setUser(null);
             setFirebaseUser(null);
+            setSelectedChild(null);
             return null;
         }
     };
@@ -61,44 +79,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setFirebaseUser(fbUser);
             if (fbUser) {
                 try {
-                    // Attempt to refresh or get the backend token
                     const backendToken = await refreshAuthToken();
                     if (backendToken) {
-                        // Fetch the full user profile from your backend using the new token
                         const userProfileRes = await apiClient.get('/users/profile');
                         setUser(userProfileRes.data);
                     } else {
-                        // If no backend token, clear user
                         setUser(null);
+                        await localforage.removeItem('userToken');
+                        await signOut(auth);
                     }
                 } catch (error) {
-                    console.error('Error fetching user profile after Firebase auth:', error);
                     setUser(null);
                     await localforage.removeItem('userToken');
                     await signOut(auth);
+                    setSelectedChild(null);
                 }
             } else {
-                // No Firebase user, clear everything
                 setUser(null);
                 await localforage.removeItem('userToken');
                 delete apiClient.defaults.headers.common['Authorization'];
+                setSelectedChild(null);
             }
-            setLoading(false); // Auth state determined
+            setLoading(false);
         });
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
-    }, [firebaseUser]); // Re-run when firebaseUser changes (e.g., login/logout)
+    }, [firebaseUser]);
 
     const login = async (email: string, password: string) => {
         setLoading(true);
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
-            const fbUser = userCredential.user;
-            // The onAuthStateChanged listener will handle setting the backend user and token
+            await signInWithEmailAndPassword(auth, email.trim(), password.trim());
         } catch (error) {
-            console.error('Firebase Login Error:', error);
-            throw error; // Re-throw to be caught by UI components
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -107,27 +120,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const register = async (username: string, email: string, password: string, role: 'student' | 'teacher' | 'parent') => {
         setLoading(true);
         try {
-            // IMPORTANT: Trim email and password before sending to Firebase
             const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
             const fbUser = userCredential.user;
-
-            // Send Firebase UID and other user data to your backend
             const res = await apiClient.post('/auth/register', {
                 username,
-                email: email.trim(), // Ensure trimmed email is sent to backend too
+                email: email.trim(),
                 role,
                 firebaseId: fbUser.uid,
-                authType: 'firebase', // Indicate Firebase auth type
+                authType: 'firebase',
             });
-
             const backendToken = res.data.token;
             await localforage.setItem('userToken', backendToken);
             apiClient.defaults.headers.common['Authorization'] = `Bearer ${backendToken}`;
-            setUser(res.data.user); // Set the backend user data
-            setFirebaseUser(fbUser); // Set the Firebase user data
+            setUser(res.data.user);
+            setFirebaseUser(fbUser);
         } catch (error) {
-            console.error('Firebase Registration Error:', error);
-            throw error; // Re-throw to be caught by UI components
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -136,13 +144,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const logout = async () => {
         setLoading(true);
         try {
-            await signOut(auth); // Sign out from Firebase
-            await localforage.removeItem('userToken'); // Clear token from storage
+            await signOut(auth);
+            await localforage.removeItem('userToken');
             setUser(null);
             setFirebaseUser(null);
-            delete apiClient.defaults.headers.common['Authorization']; // Remove auth header
+            delete apiClient.defaults.headers.common['Authorization'];
+            setSelectedChild(null);
         } catch (error) {
-            console.error('Firebase Logout Error:', error);
             throw error;
         } finally {
             setLoading(false);
@@ -157,12 +165,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         logout,
         refreshAuthToken,
+        selectedChild,
+        setSelectedChild,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook to use the AuthContext
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
@@ -170,5 +179,3 @@ export const useAuth = () => {
     }
     return context;
 };
-
-

@@ -5,10 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { BookOpenIcon, PlayCircleIcon, PuzzlePieceIcon, RocketLaunchIcon, ArrowsRightLeftIcon, ArrowPathIcon, ExclamationCircleIcon, ChartBarIcon, StarIcon } from '@heroicons/react/24/outline';
 import { Module, GameProgress } from '../types';
+import { useAnalytics } from '../hooks/useAnalytics'; // Import the new hook
 
 const ModuleDetailPage: React.FC = () => {
     const { moduleId } = useParams<{ moduleId: string }>();
     const { user } = useAuth();
+    const { trackEvent } = useAnalytics(); // Use the analytics hook
     const [module, setModule] = useState<Module | null>(null);
     const [progress, setProgress] = useState<GameProgress | null>(null);
     const [loading, setLoading] = useState(true);
@@ -22,6 +24,9 @@ const ModuleDetailPage: React.FC = () => {
             try {
                 const moduleRes = await apiClient.get<Module>(`/modules/${moduleId}`);
                 setModule(moduleRes.data);
+
+                // Track 'MODULE_VIEWED' event when module details are successfully loaded
+                trackEvent('MODULE_VIEWED', { moduleId: moduleRes.data._id, moduleTitle: moduleRes.data.title });
 
                 if (user) {
                     try {
@@ -43,7 +48,7 @@ const ModuleDetailPage: React.FC = () => {
             }
         };
         fetchData();
-    }, [moduleId, user]);
+    }, [moduleId, user, trackEvent]); // Add trackEvent to dependency array
 
     const handleUpdateProgress = async (completed: boolean, score: number, hintsUsed: number, customData: any) => {
         if (!user || !module?._id) {
@@ -75,10 +80,36 @@ const ModuleDetailPage: React.FC = () => {
             setGamificationMessage(message);
             setTimeout(() => setGamificationMessage(null), 5000);
             console.log('Gamification response:', res.data);
+
+            // Track 'MODULE_COMPLETED' event if the module is marked as completed
+            if (completed) {
+                trackEvent('MODULE_COMPLETED', {
+                    moduleId: module._id,
+                    moduleTitle: module.title,
+                    finalScore: score,
+                    overallProgress: 100
+                });
+            } else {
+                // You might also want to track partial progress updates, e.g., 'MODULE_PROGRESS_UPDATED'
+                trackEvent('MODULE_PROGRESS_UPDATED', {
+                    moduleId: module._id,
+                    moduleTitle: module.title,
+                    currentScore: score,
+                    currentProgress: completed ? 100 : 50
+                });
+            }
+
         } catch (error: any) {
             console.error('Failed to update progress:', error.response?.data || error.message);
             setGamificationMessage('Error: Failed to save progress.');
             setTimeout(() => setGamificationMessage(null), 3000);
+            // Track error event if progress update fails
+            trackEvent('PROGRESS_UPDATE_FAILED', {
+                moduleId: module?._id,
+                moduleTitle: module?.title,
+                error: error.response?.data || error.message,
+                attemptedCompletion: completed
+            });
         }
     };
 

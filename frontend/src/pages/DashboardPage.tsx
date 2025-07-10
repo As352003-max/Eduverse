@@ -65,7 +65,8 @@ const DashboardPage: React.FC = () => {
                 if (user.role === 'student') {
                     res = await apiClient.get<StudentAnalyticsData>(`/analytics/student/${user._id}`);
                 } else if (user.role === 'teacher' || user.role === 'parent') {
-                    res = await apiClient.get<StudentInfo[]>('/users/students');
+                    // CORRECTED LINE: Changed from '/users/students' to '/users/role/student'
+                    res = await apiClient.get<StudentInfo[]>('/users/role/student');
                 } else if (user.role === 'admin') {
                     res = await apiClient.get<AdminOverviewData>('/analytics/overview');
                 } else {
@@ -231,10 +232,14 @@ const DashboardPage: React.FC = () => {
                             <ul className="divide-y divide-gray-200">
                                 {data.map((student: StudentInfo) => (
                                     <li key={student._id} className="py-3 flex justify-between items-center">
-                                        <Link to={`/student-progress/${student._id}`} className="text-blue-600 hover:underline text-lg font-medium">
-                                            {student.username}
-                                        </Link>
-                                        <span className="text-gray-700">Level: {student.currentLevel} | XP: {student.totalXp}</span>
+                                        <div>
+                                            <p className="text-lg font-semibold text-gray-800">{student.username}</p>
+                                            <p className="text-sm text-gray-500">{student.email}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-md text-gray-700">Level: {student.currentLevel}</p>
+                                            <p className="text-md text-gray-700">XP: {student.totalXp}</p>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -242,7 +247,7 @@ const DashboardPage: React.FC = () => {
                     </motion.div>
                 )}
 
-                {user.role === 'admin' && data && typeof data === 'object' && 'totalUsers' in data && (
+                {user.role === 'admin' && data && !Array.isArray(data) && (data as AdminOverviewData).totalUsers !== undefined && (
                     <motion.div
                         initial={{ opacity: 0, x: -50 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -252,20 +257,35 @@ const DashboardPage: React.FC = () => {
                         <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
                             <SparklesIcon className="h-7 w-7 mr-3 text-indigo-600" /> Admin Overview
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-lg text-gray-700">
-                            <p><strong>Total Users:</strong> <span className="font-semibold text-indigo-700">{(data as AdminOverviewData).totalUsers}</span></p>
-                            <p><strong>Total Students:</strong> <span className="font-semibold text-green-700">{(data as AdminOverviewData).totalStudents}</span></p>
-                            <p><strong>Total Teachers:</strong> <span className="font-semibold text-blue-700">{(data as AdminOverviewData).totalTeachers}</span></p>
-                            <p><strong>Total Parents:</strong> <span className="font-semibold text-purple-700">{(data as AdminOverviewData).totalParents}</span></p>
-                            <p><strong>Active Modules:</strong> <span className="font-semibold text-yellow-700">{(data as AdminOverviewData).activeModules}</span></p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-lg text-gray-700">
+                            <div className="bg-blue-50 p-4 rounded-lg shadow-sm">
+                                <p className="text-sm text-gray-600">Total Users</p>
+                                <p className="text-2xl font-semibold text-blue-800">{(data as AdminOverviewData).totalUsers}</p>
+                            </div>
+                            <div className="bg-green-50 p-4 rounded-lg shadow-sm">
+                                <p className="text-sm text-gray-600">Total Students</p>
+                                <p className="text-2xl font-semibold text-green-800">{(data as AdminOverviewData).totalStudents}</p>
+                            </div>
+                            <div className="bg-purple-50 p-4 rounded-lg shadow-sm">
+                                <p className="text-sm text-gray-600">Total Teachers</p>
+                                <p className="text-2xl font-semibold text-purple-800">{(data as AdminOverviewData).totalTeachers}</p>
+                            </div>
+                            <div className="bg-yellow-50 p-4 rounded-lg shadow-sm">
+                                <p className="text-sm text-gray-600">Total Parents</p>
+                                <p className="text-2xl font-semibold text-yellow-800">{(data as AdminOverviewData).totalParents}</p>
+                            </div>
+                            <div className="bg-red-50 p-4 rounded-lg shadow-sm">
+                                <p className="text-sm text-gray-600">Active Modules</p>
+                                <p className="text-2xl font-semibold text-red-800">{(data as AdminOverviewData).activeModules}</p>
+                            </div>
                         </div>
                     </motion.div>
                 )}
 
-                <div className="text-center mt-12">
+                <div className="text-center mt-10">
                     <button
                         onClick={handleLogout}
-                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                     >
                         Logout
                     </button>
