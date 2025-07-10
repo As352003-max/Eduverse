@@ -34,7 +34,7 @@ interface Project {
     updatedAt: string;
 }
 
-const ProjectDetailPage: React.FC = () => {
+const ProjectDetailsPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>(); // Use projectId for clarity
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -233,4 +233,4 @@ const ProjectDetailPage: React.FC = () => {
     );
 };
 
-export default ProjectDetailPage;
+export default ProjectDetailsPage;

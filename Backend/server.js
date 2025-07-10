@@ -33,7 +33,7 @@ app.use(express.json());
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'https://eduverse-ebon.vercel.app'], // <-- It's already here!
+    origin: allowedOrigins,
     credentials: true,
   }
 });
@@ -44,12 +44,6 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-app.use(cors({
-    origin: allowedOrigins, // Use the dynamically generated allowedOrigins array
-    credentials: true,
-}));
-app.use(express.json());
-
 const authRoutes = require('./routes/authRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
@@ -58,7 +52,6 @@ const projectRoutes = require('./routes/projectRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const aiChatRoutes = require('./routes/aiChatRoutes'); 
-
 
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);

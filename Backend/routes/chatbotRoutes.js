@@ -6,7 +6,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// POST /api/chatbot/message — send message to Gemini and get response
+// POST: Send message to Gemini and get response
 router.post('/message', protect, async (req, res) => {
     const { message, sessionId } = req.body;
     const userId = req.user.id;
@@ -17,17 +17,19 @@ router.post('/message', protect, async (req, res) => {
 
     try {
         let session;
+
         if (sessionId) {
             session = await ChatSession.findById(sessionId);
         } else {
             session = await ChatSession.findOne({ userId });
         }
 
+        // Create session if none found
         if (!session) {
             session = new ChatSession({ userId, history: [] });
         }
 
-        // Remove _id from parts to satisfy Gemini API
+        // Prepare chat history for Gemini (cleaned)
         const chatHistoryForGemini = session.history.map(msg => ({
             role: msg.role,
             parts: msg.parts.map(p => ({ text: p.text }))
@@ -42,10 +44,10 @@ router.post('/message', protect, async (req, res) => {
         const result = await chat.sendMessage(message);
         const responseText = result.response.text();
 
-        // Save new messages
+        // Save messages
         session.history.push({ role: 'user', parts: [{ text: message }] });
         session.history.push({ role: 'model', parts: [{ text: responseText }] });
-        session.lastActive = Date.now();
+        session.lastActive = new Date();
         await session.save();
 
         res.status(200).json({
@@ -56,15 +58,15 @@ router.post('/message', protect, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Error interacting with chatbot:', error.response?.data || error.stack || error.message);
+        console.error('❌ Error in /message:', error.stack || error.message);
         res.status(500).json({
-            message: 'Server error interacting with chatbot.',
-            error: error.response?.data || error.message,
+            message: 'Server error while interacting with chatbot.',
+            error: error.message,
         });
     }
 });
 
-// GET /api/chatbot/sessions — fetch all sessions with optional filters
+// GET: Fetch all chat sessions for the user
 router.get('/sessions', protect, async (req, res) => {
     const { title, dateFrom, dateTo } = req.query;
     const userId = req.user.id;
@@ -85,30 +87,34 @@ router.get('/sessions', protect, async (req, res) => {
         const sessions = await ChatSession.find(query).sort({ updatedAt: -1 });
         res.status(200).json(sessions);
     } catch (err) {
-        console.error('Error fetching sessions:', err);
-        res.status(500).json({ message: 'Failed to fetch chat sessions.', error: err.message });
+        console.error('❌ Error fetching sessions:', err.message);
+        res.status(500).json({ message: 'Failed to fetch chat sessions.' });
     }
 });
 
-// GET /api/chatbot/session/:sessionId — fetch a single chat session by ID
+// ✅ FIXED GET /session/:sessionId (was giving 404)
 router.get('/session/:sessionId', protect, async (req, res) => {
     const { sessionId } = req.params;
+    const userId = req.user.id;
 
     try {
-        const session = await ChatSession.findOne({ _id: sessionId, userId: req.user.id });
+        console.log('🔍 Fetching session:', sessionId, 'for user:', userId);
+
+        const session = await ChatSession.findOne({ _id: sessionId, userId });
 
         if (!session) {
+            console.warn('❌ Session not found or unauthorized access');
             return res.status(404).json({ message: 'Session not found or unauthorized.' });
         }
 
         res.status(200).json(session);
     } catch (err) {
-        console.error('Error fetching session by ID:', err);
-        res.status(500).json({ message: 'Failed to fetch chat session.', error: err.message });
+        console.error('❌ Error fetching session:', err.message);
+        res.status(500).json({ message: 'Failed to fetch chat session.' });
     }
 });
 
-// POST /api/chatbot/new-session — create a new session
+// POST: Create a new session
 router.post('/new-session', protect, async (req, res) => {
     const { title } = req.body;
     const userId = req.user.id;
@@ -123,19 +129,20 @@ router.post('/new-session', protect, async (req, res) => {
         await session.save();
         res.status(201).json({ message: 'New session created.', session });
     } catch (err) {
-        console.error('Error creating session:', err);
-        res.status(500).json({ message: 'Failed to create chat session.', error: err.message });
+        console.error('❌ Error creating session:', err.message);
+        res.status(500).json({ message: 'Failed to create chat session.' });
     }
 });
 
-// PUT /api/chatbot/session/:sessionId/rename — rename a session
+// PUT: Rename a session
 router.put('/session/:sessionId/rename', protect, async (req, res) => {
     const { sessionId } = req.params;
     const { title } = req.body;
+    const userId = req.user.id;
 
     try {
         const session = await ChatSession.findOneAndUpdate(
-            { _id: sessionId, userId: req.user.id },
+            { _id: sessionId, userId },
             { title },
             { new: true }
         );
@@ -146,10 +153,9 @@ router.put('/session/:sessionId/rename', protect, async (req, res) => {
 
         res.status(200).json({ message: 'Session renamed.', session });
     } catch (err) {
-        console.error('Error renaming session:', err);
-        res.status(500).json({ message: 'Failed to rename session.', error: err.message });
+        console.error('❌ Error renaming session:', err.message);
+        res.status(500).json({ message: 'Failed to rename session.' });
     }
 });
 
 module.exports = router;
-g
