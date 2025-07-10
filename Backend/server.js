@@ -31,6 +31,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// ✅ Request Timing Logger Middleware
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms`);
+    });
+    next();
+});
+
 const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
@@ -40,10 +50,12 @@ const io = new Server(server, {
 
 module.exports.io = io;
 
+// ✅ MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
+// ✅ Rate Limiters
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -63,6 +75,7 @@ const loginLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use('/api/auth/login', loginLimiter);
 
+// ✅ Routes
 const authRoutes = require('./routes/authRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
@@ -89,6 +102,7 @@ app.get('/', (req, res) => {
     res.send('Eduverse Backend API is running!');
 });
 
+// ✅ Socket.IO
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 

@@ -3,84 +3,15 @@ const router = express.Router();
 const User = require('../models/User');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
+// 🔐 GET user profile
 router.get('/profile', protect, async (req, res) => {
+    console.log(`🔐 [GET] /users/profile for ${req.user.email}`);
+    const start = Date.now();
+
     try {
         const user = await User.findById(req.user._id).select('-password');
-        if (user) {
-            res.status(200).json({
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                role: user.role,
-                totalXp: user.totalXp,
-                currentLevel: user.currentLevel,
-                badges: user.badges,
-                ...(user.role === 'student' && user.grade && { grade: user.grade }),
-            });
-        } else {
-            res.status(404).json({ message: 'User not found.' });
-        }
-    } catch (error) {
-        console.error('Error fetching user profile:', error);
-        res.status(500).json({ message: 'Server error fetching user profile.', error: error.message });
-    }
-});
+        if (!user) return res.status(404).json({ message: 'User not found.' });
 
-router.get('/role/:roleName', protect, async (req, res) => {
-    try {
-        const { roleName } = req.params;
-        const validRoles = ['student', 'teacher', 'admin', 'parent'];
-        if (!validRoles.includes(roleName)) {
-            return res.status(400).json({ message: `Invalid role specified: ${roleName}. Valid roles are: ${validRoles.join(', ')}.` });
-        }
-        if (req.user.role === 'admin') {
-        } else if (['teacher', 'parent'].includes(req.user.role) && roleName === 'student') {
-        } else {
-            return res.status(403).json({ message: `Not authorized to view users of role: ${roleName}.` });
-        }
-        const users = await User.find({ role: roleName }).select('-password');
-        if (users.length === 0) {
-            return res.status(404).json({ message: `No ${roleName}s found.` });
-        }
-        const filteredUsers = users.map(user => ({
-            _id: user._id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            totalXp: user.totalXp,
-            currentLevel: user.currentLevel,
-            ...(user.role === 'student' && user.grade && { grade: user.grade }),
-        }));
-        res.status(200).json(filteredUsers);
-    } catch (error) {
-        console.error(`Error fetching users by role (${req.params.roleName}):`, error);
-        if (error.name === 'CastError') {
-             return res.status(400).json({ message: 'Invalid role parameter format.' });
-        }
-        res.status(500).json({ message: 'Server error fetching users by role.', error: error.message });
-    }
-});
-
-router.get('/all', protect, authorizeRoles('admin'), async (req, res) => {
-    try {
-        const users = await User.find({}).select('-password');
-        res.status(200).json(users);
-    } catch (error) {
-        console.error('Error fetching all users:', error);
-        res.status(500).json({ message: 'Server error fetching all users.', error: error.message });
-    }
-});
-
-router.get('/:id', protect, async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (req.user._id.toString() !== id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to view this user\'s profile.' });
-        }
-        const user = await User.findById(id).select('-password');
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
         res.status(200).json({
             _id: user._id,
             username: user.username,
@@ -92,31 +23,128 @@ router.get('/:id', protect, async (req, res) => {
             ...(user.role === 'student' && user.grade && { grade: user.grade }),
         });
     } catch (error) {
-        console.error('Error fetching user by ID:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid User ID format.' });
-        }
-        res.status(500).json({ message: 'Server error fetching user by ID.', error: error.message });
+        console.error('❌ Error fetching profile:', error.message);
+        res.status(500).json({ message: 'Server error fetching profile.', error: error.message });
+    } finally {
+        console.log(`⏱️ [GET] /users/profile took ${Date.now() - start}ms`);
     }
 });
 
-router.put('/:id', protect, async (req, res) => {
+// 📚 GET users by role
+router.get('/role/:roleName', protect, async (req, res) => {
+    const start = Date.now();
+    const { roleName } = req.params;
+    const requester = req.user;
+
+    console.log(`🔎 [GET] /users/role/${roleName} by ${requester.email} (${requester.role})`);
+
     try {
-        const { id } = req.params;
-        const updates = { ...req.body };
-        if (req.user._id.toString() !== id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized to update this user\'s profile.' });
+        const validRoles = ['student', 'teacher', 'admin', 'parent'];
+        if (!validRoles.includes(roleName)) {
+            return res.status(400).json({ message: `Invalid role: ${roleName}` });
         }
-        if (updates.role && req.user.role !== 'admin') {
-            delete updates.role;
+
+        const authorized =
+            requester.role === 'admin' ||
+            (['teacher', 'parent'].includes(requester.role) && roleName === 'student');
+
+        if (!authorized) {
+            return res.status(403).json({ message: 'Not authorized to access this role.' });
         }
-        if (updates.password) {
-            delete updates.password;
+
+        const users = await User.find({ role: roleName }).select('-password');
+        if (!users.length) {
+            return res.status(404).json({ message: `No ${roleName}s found.` });
         }
-        const updatedUser = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-password');
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found.' });
+
+        const filtered = users.map(u => ({
+            _id: u._id,
+            username: u.username,
+            email: u.email,
+            role: u.role,
+            totalXp: u.totalXp,
+            currentLevel: u.currentLevel,
+            ...(u.role === 'student' && u.grade && { grade: u.grade }),
+        }));
+
+        res.status(200).json(filtered);
+    } catch (error) {
+        console.error(`❌ Error fetching ${roleName}s:`, error.message);
+        res.status(500).json({ message: 'Server error fetching users by role.', error: error.message });
+    } finally {
+        console.log(`⏱️ [GET] /users/role/${roleName} took ${Date.now() - start}ms`);
+    }
+});
+
+// 🔍 GET all users (admin only)
+router.get('/all', protect, authorizeRoles('admin'), async (req, res) => {
+    console.log(`🧑‍💼 [GET] /users/all by admin`);
+    try {
+        const users = await User.find({}).select('-password');
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('❌ Error fetching all users:', error.message);
+        res.status(500).json({ message: 'Server error fetching all users.', error: error.message });
+    }
+});
+
+// 👤 GET specific user by ID
+router.get('/:id', protect, async (req, res) => {
+    const { id } = req.params;
+    const start = Date.now();
+    const requester = req.user;
+
+    console.log(`📄 [GET] /users/${id} by ${requester.email} (${requester.role})`);
+
+    try {
+        if (requester._id.toString() !== id && requester.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to view this profile.' });
         }
+
+        const user = await User.findById(id).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        res.status(200).json({
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            totalXp: user.totalXp,
+            currentLevel: user.currentLevel,
+            badges: user.badges,
+            ...(user.role === 'student' && user.grade && { grade: user.grade }),
+        });
+    } catch (error) {
+        console.error('❌ Error fetching user by ID:', error.message);
+        res.status(500).json({ message: 'Server error fetching user.', error: error.message });
+    } finally {
+        console.log(`⏱️ [GET] /users/${id} took ${Date.now() - start}ms`);
+    }
+});
+
+// ✏️ UPDATE user
+router.put('/:id', protect, async (req, res) => {
+    const { id } = req.params;
+    const updates = { ...req.body };
+    const requester = req.user;
+
+    console.log(`✏️ [PUT] /users/${id} by ${requester.email}`);
+
+    try {
+        if (requester._id.toString() !== id && requester.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to update this user.' });
+        }
+
+        if (updates.role && requester.role !== 'admin') delete updates.role;
+        if (updates.password) delete updates.password;
+
+        const updatedUser = await User.findByIdAndUpdate(id, updates, {
+            new: true,
+            runValidators: true,
+        }).select('-password');
+
+        if (!updatedUser) return res.status(404).json({ message: 'User not found.' });
+
         res.status(200).json({
             _id: updatedUser._id,
             username: updatedUser.username,
@@ -128,30 +156,23 @@ router.put('/:id', protect, async (req, res) => {
             ...(updatedUser.role === 'student' && updatedUser.grade && { grade: updatedUser.grade }),
         });
     } catch (error) {
-        console.error('Error updating user profile:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid User ID format for update.' });
-        }
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ message: error.message });
-        }
-        res.status(500).json({ message: 'Server error updating user profile.', error: error.message });
+        console.error('❌ Error updating user:', error.message);
+        res.status(500).json({ message: 'Server error updating user.', error: error.message });
     }
 });
 
+// 🗑️ DELETE user (admin only)
 router.delete('/:id', protect, authorizeRoles('admin'), async (req, res) => {
+    const { id } = req.params;
+    console.log(`🗑️ [DELETE] /users/${id}`);
+
     try {
-        const { id } = req.params;
-        const user = await User.findByIdAndDelete(id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
+        const deletedUser = await User.findByIdAndDelete(id);
+        if (!deletedUser) return res.status(404).json({ message: 'User not found.' });
+
         res.status(200).json({ message: 'User deleted successfully.' });
     } catch (error) {
-        console.error('Error deleting user:', error);
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid User ID format for deletion.' });
-        }
+        console.error('❌ Error deleting user:', error.message);
         res.status(500).json({ message: 'Server error deleting user.', error: error.message });
     }
 });

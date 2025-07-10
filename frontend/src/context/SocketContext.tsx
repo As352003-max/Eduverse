@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 interface SocketContextType {
     socket: Socket | null;
@@ -56,21 +54,17 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
             newSocket.on('connect_error', (error) => {
                 console.error('Socket.IO connection error:', error.message);
-                toast.error(`Socket connection error: ${error.message}`, { autoClose: 7000 });
+                // toast removed
             });
 
             newSocket.on('achievementUnlocked', (data: AchievementPayload) => {
                 console.log('Achievement Unlocked:', data);
-                if (data.type === 'levelUp') {
-                    toast.success(data.message, { autoClose: 5000 });
-                } else if (data.type === 'badge') {
-                    toast.info(data.message, { autoClose: 5000 });
-                }
+                // toast removed
             });
 
             newSocket.on('leaderboardUpdate', (data: LeaderboardUpdatePayload) => {
                 console.log('Leaderboard Updated:', data);
-                toast.success(data.message || 'Leaderboard has been updated!', { autoClose: 3000 });
+                // toast removed
             });
 
             setSocket(newSocket);

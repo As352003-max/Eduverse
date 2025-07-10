@@ -6,7 +6,6 @@ import {
     signOut,
     onAuthStateChanged,
     User as FirebaseUser,
-    getIdToken,
 } from 'firebase/auth';
 import localforage from 'localforage';
 import apiClient from '../api/axiosClient';
@@ -32,7 +31,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(() => {
+        const cached = localStorage.getItem('user');
+        try {
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            localStorage.removeItem('user');
+            return null;
+        }
+    });
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedChild, setSelectedChild] = useState<SelectedChild | null>(() => {
@@ -76,35 +83,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+            console.log('[Auth] Firebase User:', fbUser);
             setFirebaseUser(fbUser);
-            if (fbUser) {
-                try {
-                    const backendToken = await refreshAuthToken();
-                    if (backendToken) {
-                        const userProfileRes = await apiClient.get('/users/profile');
-                        setUser(userProfileRes.data);
-                    } else {
-                        setUser(null);
-                        await localforage.removeItem('userToken');
-                        await signOut(auth);
-                    }
-                } catch (error) {
-                    setUser(null);
-                    await localforage.removeItem('userToken');
-                    await signOut(auth);
-                    setSelectedChild(null);
-                }
-            } else {
+
+            if (!fbUser) {
                 setUser(null);
+                localStorage.removeItem('user');
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const token = await fbUser.getIdToken(true);
+                const res = await apiClient.post('/auth/firebase-auth', { token });
+                const backendToken = res.data.token;
+                await localforage.setItem('userToken', backendToken);
+                apiClient.defaults.headers.common['Authorization'] = `Bearer ${backendToken}`;
+
+                const profileRes = await apiClient.get('/users/profile');
+                setUser(profileRes.data);
+                localStorage.setItem('user', JSON.stringify(profileRes.data));
+                console.log('[Auth] User set:', profileRes.data);
+            } catch (error) {
+                console.error('[Auth] Error during token sync:', error);
+                await signOut(auth);
                 await localforage.removeItem('userToken');
-                delete apiClient.defaults.headers.common['Authorization'];
+                setUser(null);
                 setSelectedChild(null);
             }
+
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [firebaseUser]);
+    }, []);
 
     const login = async (email: string, password: string) => {
         setLoading(true);
@@ -133,6 +145,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await localforage.setItem('userToken', backendToken);
             apiClient.defaults.headers.common['Authorization'] = `Bearer ${backendToken}`;
             setUser(res.data.user);
+            localStorage.setItem('user', JSON.stringify(res.data.user));
             setFirebaseUser(fbUser);
         } catch (error) {
             throw error;
@@ -148,6 +161,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await localforage.removeItem('userToken');
             setUser(null);
             setFirebaseUser(null);
+            localStorage.removeItem('user');
             delete apiClient.defaults.headers.common['Authorization'];
             setSelectedChild(null);
         } catch (error) {
