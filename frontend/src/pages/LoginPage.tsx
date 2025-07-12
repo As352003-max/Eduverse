@@ -1,4 +1,3 @@
-// frontend/src/pages/LoginPage.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,23 +18,29 @@ const LoginPage: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+
         try {
-            const user = await login(email.trim(), password.trim());
-            switch (user.role) {
-                case 'student':
-                    navigate('/dashboard/student');
-                    break;
-                case 'teacher':
-                    navigate('/dashboard/teacher');
-                    break;
-                case 'parent':
-                    navigate('/dashboard/parent');
-                    break;
-                default:
-                    navigate('/dashboard');
+            const loggedInUser = await login(email.trim(), password.trim());
+            if (loggedInUser) {
+                switch (loggedInUser.role) {
+                    case 'student':
+                        navigate('/dashboard/student');
+                        break;
+                    case 'teacher':
+                        navigate('/dashboard/teacher');
+                        break;
+                    case 'parent':
+                        navigate('/dashboard/parent');
+                        break;
+                    default:
+                        navigate('/dashboard');
+                }
+            } else {
+                setError('Login failed. Please check your credentials.');
             }
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            console.error('Login error:', err);
+            setError(err.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -43,6 +48,7 @@ const LoginPage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col md:flex-row">
+            {/* Left banner */}
             <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-900 via-purple-700 to-pink-600 items-center justify-center relative">
                 <motion.div
                     initial={{ opacity: 0, x: -50 }}
@@ -67,6 +73,7 @@ const LoginPage: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
             </div>
 
+            {/* Right form */}
             <div className="flex w-full md:w-1/2 items-center justify-center bg-white">
                 <motion.div
                     initial={{ opacity: 0, y: 50 }}
@@ -88,27 +95,37 @@ const LoginPage: React.FC = () => {
                         </motion.div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* FORM STARTS HERE */}
+                    <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
+                        {/* Dummy hidden fields to confuse browser autofill */}
+                        <input type="text" name="fakeuser" autoComplete="username" className="hidden" />
+                        <input type="password" name="fakepass" autoComplete="new-password" className="hidden" />
+
                         <div>
                             <label htmlFor="email" className="block text-gray-700 text-sm font-semibold mb-2">
                                 <EnvelopeIcon className="inline-block h-5 w-5 mr-1 text-gray-500" /> Email Address
                             </label>
                             <input
                                 type="email"
+                                name="email"
                                 id="email"
+                                autoComplete="off"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
+
                         <div>
                             <label htmlFor="password" className="block text-gray-700 text-sm font-semibold mb-2">
                                 <LockClosedIcon className="inline-block h-5 w-5 mr-1 text-gray-500" /> Password
                             </label>
                             <input
                                 type="password"
+                                name="password"
                                 id="password"
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required

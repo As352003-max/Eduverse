@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { CheckBadgeIcon } from '@heroicons/react/24/solid';
 import {
     HomeIcon,
     Bars3Icon,
@@ -12,7 +12,8 @@ import {
     ChatBubbleLeftRightIcon,
     TrophyIcon,
     BookOpenIcon,
-    RectangleStackIcon
+    RectangleStackIcon,
+    PuzzlePieceIcon // New icon for Games
 } from '@heroicons/react/24/outline';
 
 const Navbar: React.FC = () => {
@@ -54,9 +55,16 @@ const Navbar: React.FC = () => {
                         <Link to="/modules" className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition">
                             <BookOpenIcon className="h-5 w-5 mr-1" /> Modules
                         </Link>
+                        <Link to="/games" className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition">
+                            <PuzzlePieceIcon className="h-5 w-5 mr-1" /> Games
+                        </Link>
                         <Link to="/projects" className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition">
                             <RectangleStackIcon className="h-5 w-5 mr-1" /> Projects
                         </Link>
+                     <Link to="/badges" className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition">
+  <CheckBadgeIcon className="h-5 w-5 mr-1" />
+  Badges
+</Link>
                         <Link to="/leaderboard" className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition">
                             <TrophyIcon className="h-5 w-5 mr-1" /> Leaderboard
                         </Link>
@@ -71,6 +79,12 @@ const Navbar: React.FC = () => {
                             {isDropdownOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10">
                                     <Link to="/profile" className="block px-4 py-2 hover:bg-indigo-50 text-gray-700">Profile</Link>
+                                    {user.role === 'teacher' && (
+                                        <Link to="/dashboard/students" className="block px-4 py-2 hover:bg-indigo-50 text-gray-700">Students Dashboard</Link>
+                                    )}
+                                    {user.role === 'parent' && (
+                                        <Link to="/children" className="block px-4 py-2 hover:bg-indigo-50 text-gray-700">My Children</Link>
+                                    )}
                                     <button onClick={handleLogout} className="block w-full text-left px-4 py-2 hover:bg-red-100 text-red-600">Logout</button>
                                 </div>
                             )}

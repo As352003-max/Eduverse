@@ -2,21 +2,32 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
-import { UserCircleIcon, StarIcon, AcademicCapIcon, EnvelopeIcon, IdentificationIcon, ArrowPathIcon, ExclamationCircleIcon, TrophyIcon, ChartBarIcon, ClockIcon } from '@heroicons/react/24/outline';
-// Assuming 'User' type from '../types' might not have all fields as optional for all roles
-// Let's refine the User type here for clarity if it's not robust enough in '../types.ts'
-// If you have a global types.ts, ensure it reflects these optional fields for non-students
-interface User {
+import CountUp from 'react-countup';
+import {
+    UserCircleIcon,
+    StarIcon,
+    AcademicCapIcon,
+    EnvelopeIcon,
+    IdentificationIcon,
+    ArrowPathIcon,
+    ExclamationCircleIcon,
+    TrophyIcon,
+    ChartBarIcon,
+    ClockIcon
+} from '@heroicons/react/24/outline';
+import BadgeDisplay from '../components/BadgeDisplay';
+import { calculateLevel } from '../utils/gamificationUtilsFrontend';
+
+interface UserProfile {
     _id: string;
     username: string;
     email: string;
     role: string;
-    grade?: string; // Optional, only for students
-    totalXp?: number; // Optional, mainly for students
-    currentLevel?: number; // Optional, mainly for students
-    badges?: string[]; // Optional, as not all users might have badges
+    grade?: number;
+    totalXp?: number;
+    currentLevel?: number;
+    badges?: string[];
 }
-
 
 interface UserAnalytics {
     totalModulesAttempted: number;
@@ -31,9 +42,17 @@ interface UserAnalytics {
     }>;
 }
 
+const motivationalQuotes = [
+    "Every expert was once a beginner.",
+    "Keep pushing your limits.",
+    "Learning never exhausts the mind.",
+    "Your journey matters more than perfection."
+];
+const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+
 const UserProfilePage: React.FC = () => {
     const { user: authUser, loading: authLoading } = useAuth();
-    const [profile, setProfile] = useState<User | null>(null);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [analytics, setAnalytics] = useState<UserAnalytics | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -43,10 +62,7 @@ const UserProfilePage: React.FC = () => {
             setLoading(true);
             setError(null);
 
-            if (authLoading) {
-                // Wait for authUser to be loaded
-                return;
-            }
+            if (authLoading) return;
 
             if (!authUser) {
                 setError('You must be logged in to view your profile.');
@@ -55,22 +71,18 @@ const UserProfilePage: React.FC = () => {
             }
 
             try {
-                // Fetch user profile data
-                const profileResponse = await apiClient.get<User>(`/users/${authUser._id}`);
+                const profileResponse = await apiClient.get<UserProfile>(`/users/${authUser._id}`);
                 setProfile(profileResponse.data);
 
-                // Fetch analytics data ONLY if the user is a student
                 if (authUser.role === 'student') {
-                    // This endpoint is causing the error if the backend doesn't properly handle the student role check
                     const analyticsResponse = await apiClient.get<{ analytics: UserAnalytics }>(`/analytics/student/${authUser._id}`);
                     setAnalytics(analyticsResponse.data.analytics);
                 } else {
-                    setAnalytics(null); // Clear analytics if not a student
+                    setAnalytics(null);
                 }
 
             } catch (err: any) {
                 console.error('Error fetching user data:', err.response?.data || err.message);
-                // More specific error handling for analytics vs. profile
                 if (err.response?.status === 404 && authUser.role === 'student') {
                     setError('Student analytics data not found. Please ensure the student ID is correct and analytics exist for them.');
                 } else {
@@ -82,7 +94,7 @@ const UserProfilePage: React.FC = () => {
         };
 
         fetchUserProfileAndAnalytics();
-    }, [authUser, authLoading]); // Depend on authUser and authLoading
+    }, [authUser, authLoading]);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -122,6 +134,8 @@ const UserProfilePage: React.FC = () => {
         return <div className="text-red-500 text-center mt-8 text-lg">Profile data not available.</div>;
     }
 
+    const userLevel = profile.totalXp !== undefined ? calculateLevel(profile.totalXp) : 1;
+
     return (
         <div className="min-h-screen bg-gray-100 py-12">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -138,6 +152,7 @@ const UserProfilePage: React.FC = () => {
                             <IdentificationIcon className="h-5 w-5 mr-2 text-gray-500" />
                             Role: <span className="font-semibold capitalize ml-1">{profile.role}</span>
                         </p>
+                        <p className="text-sm italic text-gray-500 mt-2">"{randomQuote}"</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-t pt-8 border-gray-200">
@@ -145,22 +160,31 @@ const UserProfilePage: React.FC = () => {
                             <EnvelopeIcon className="h-6 w-6 mr-3 text-blue-500" />
                             <span className="font-semibold">Email:</span> {profile.email}
                         </motion.div>
-                        {profile.role === 'student' && profile.grade && (
+                        {profile.role === 'student' && profile.grade !== undefined && (
                             <motion.div variants={itemVariants} className="flex items-center text-gray-700">
                                 <AcademicCapIcon className="h-6 w-6 mr-3 text-green-500" />
                                 <span className="font-semibold">Grade:</span> {profile.grade}
                             </motion.div>
                         )}
-                        {profile.totalXp !== undefined && ( // Only show if totalXp is explicitly set
-                            <motion.div variants={itemVariants} className="flex items-center text-gray-700">
-                                <StarIcon className="h-6 w-6 mr-3 text-yellow-500" />
-                                <span className="font-semibold">Total XP:</span> {profile.totalXp}
+                        {profile.totalXp !== undefined && (
+                            <motion.div variants={itemVariants} className="flex flex-col text-gray-700">
+                                <div className="flex items-center">
+                                    <StarIcon className="h-6 w-6 mr-3 text-yellow-500" />
+                                    <span className="font-semibold">Total XP:</span> <CountUp end={profile.totalXp} duration={1.5} />
+                                </div>
+                                <div className="h-3 bg-gray-300 rounded-full overflow-hidden mt-2">
+                                    <div
+                                        className="bg-indigo-600 h-full"
+                                        style={{ width: `${(profile.totalXp % 1000) / 10}%` }}
+                                    />
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">XP to next level: {1000 - (profile.totalXp % 1000)}</p>
                             </motion.div>
                         )}
-                        {profile.currentLevel !== undefined && ( // Only show if currentLevel is explicitly set
+                        {profile.totalXp !== undefined && (
                             <motion.div variants={itemVariants} className="flex items-center text-gray-700">
                                 <TrophyIcon className="h-6 w-6 mr-3 text-purple-500" />
-                                <span className="font-semibold">Current Level:</span> {profile.currentLevel}
+                                <span className="font-semibold">Current Level:</span> {userLevel}
                             </motion.div>
                         )}
                     </div>
@@ -171,16 +195,18 @@ const UserProfilePage: React.FC = () => {
                                 <TrophyIcon className="h-7 w-7 mr-3 text-yellow-500" />
                                 Badges Earned
                             </h2>
-                            <div className="flex flex-wrap gap-3">
-                                {profile.badges.map((badge, index) => (
-                                    <motion.span
-                                        key={index}
-                                        variants={itemVariants}
-                                        className="bg-indigo-100 text-indigo-800 text-sm font-medium px-4 py-1.5 rounded-full shadow-sm flex items-center"
-                                    >
-                                        <StarIcon className="h-4 w-4 mr-2 text-indigo-600" /> {badge}
-                                    </motion.span>
-                                ))}
+                            <BadgeDisplay badges={profile.badges} />
+                        </motion.div>
+                    )}
+
+                    {!profile.badges || profile.badges.length === 0 && (
+                        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="mb-8 border-t pt-8 border-gray-200">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                                <TrophyIcon className="h-7 w-7 mr-3 text-yellow-500" />
+                                Badges Earned
+                            </h2>
+                            <div className="text-center text-gray-600 p-4 bg-gray-100 rounded-lg">
+                                <p>No badges earned yet. Keep playing to unlock them!</p>
                             </div>
                         </motion.div>
                     )}

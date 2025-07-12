@@ -21,7 +21,15 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import UserProfilePage from './pages/UserProfilePage';
 import StudentProgressDetailPage from './pages/StudentProgressDetailPage';
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
-import MyChildrenPage from './pages/MyChildrenPage'; // Import the new MyChildrenPage
+import MyChildrenPage from './pages/MyChildrenPage';
+import GamesHubPage from './pages/GamesHubPage';
+import MathMazePage from './pages/MathMazePage';
+import VocabVanguardPage from './pages/VocabVanguardPage';
+import LogicCircuitPage from './pages/LogicCircuitPage';
+
+import BadgePages from './pages/BadgePages';
+
+
 
 const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
     const { user, loading } = useAuth();
@@ -71,18 +79,21 @@ const AppContent: React.FC = () => {
 
                 <Route path="/dashboard/students/:studentId" element={<PrivateRoute allowedRoles={['teacher', 'parent', 'admin']}><StudentProgressDetailPage /></PrivateRoute>} />
 
-                {/* New route for MyChildrenPage */}
                 <Route path="/children" element={<PrivateRoute allowedRoles={['parent', 'admin']}><MyChildrenPage /></PrivateRoute>} />
-                {/* Placeholder for individual child's dashboard, if different from StudentProgressDetailPage */}
-                {/* If a parent views their child's progress, they'd use StudentProgressDetailPage */}
-                {/* So, this route might not be strictly necessary if /dashboard/students/:studentId is sufficient */}
-                {/* If you need a unique dashboard specific to a child's login, you'd add it here */}
                 <Route path="/children/:childId/dashboard" element={<PrivateRoute allowedRoles={['parent', 'admin']}><StudentProgressDetailPage /></PrivateRoute>} />
 
+                <Route path="/badges" element={<PrivateRoute><BadgePages/></PrivateRoute>} />
 
                 <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} />
                 <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} />
                 <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
+                
+                <Route path="/games" element={<PrivateRoute><GamesHubPage /></PrivateRoute>} />
+
+                <Route path="/game/mathmaze/:moduleId" element={<PrivateRoute><MathMazePage /></PrivateRoute>} />
+                <Route path="/game/vocabvanguard/:moduleId" element={<PrivateRoute><VocabVanguardPage /></PrivateRoute>} />
+                <Route path="/game/logiccircuit/:moduleId" element={<PrivateRoute><LogicCircuitPage /></PrivateRoute>} />
+                
                 <Route path="/ai-chat" element={<PrivateRoute><AIChatPage /></PrivateRoute>} />
                 <Route path="/projects" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
                 <Route path="/projects/create" element={<PrivateRoute allowedRoles={['student']}><CreateEditProjectPage /></PrivateRoute>} />
