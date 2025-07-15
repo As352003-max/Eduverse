@@ -49,7 +49,7 @@ const LoginPage: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col md:flex-row">
             {/* Left banner */}
-            <div className="hidden md:flex w-1/2 bg-gradient-to-br from-indigo-900 via-purple-700 to-pink-600 items-center justify-center relative">
+            <div className="hidden md:flex w-1/2 items-center justify-center relative" style={{ background: 'linear-gradient(135deg, #EAF2FD 0%, #4F46E5 50%, #A21CAF 100%)' }}>
                 <motion.div
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}

@@ -1,3 +1,4 @@
+// In your backend Mongoose schema for AnalyticsEvent
 const mongoose = require('mongoose');
 
 const analyticsEventSchema = new mongoose.Schema({
@@ -13,8 +14,9 @@ const analyticsEventSchema = new mongoose.Schema({
         },
         kind: {
             type: String,
-            enum: ['User', 'Child', 'Anonymous'],
-            default: 'Anonymous',
+            // FIX: Change to lowercase enum values to match frontend
+            enum: ['user', 'child', 'anonymous'], // Changed here!
+            default: 'anonymous', // Also change default for consistency
         },
     },
     eventData: {

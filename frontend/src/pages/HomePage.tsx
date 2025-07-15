@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from "react";
+// HomePage.tsx
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import gsap from "gsap";
 import Particles from "react-tsparticles";
-import { loadSlim } from "tsparticles-slim"; // ✅ Use slim version
+import { loadSlim } from "tsparticles-slim";
 
 const quotes = [
   "“Education is the passport to the future, for tomorrow belongs to those who prepare for it today.” – Malcolm X",
@@ -14,6 +15,8 @@ const quotes = [
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const quoteRef = useRef<HTMLParagraphElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
 
   const navCards = [
     {
@@ -28,9 +31,17 @@ const HomePage: React.FC = () => {
       title: "Play & Earn XP",
       description: "Engage in fun games and quizzes to earn experience points.",
       icon: "🎮",
-      link: "/game/start",
+      link: "/games",
       bgColor: "bg-green-100",
       textColor: "text-green-700",
+    },
+    {
+      title: "Take a Quiz",
+      description: "Test your knowledge and track your progress.",
+      icon: "📝",
+      link: "/quiz",
+      bgColor: "bg-pink-100",
+      textColor: "text-pink-700",
     },
     {
       title: "Ask the AI",
@@ -67,7 +78,7 @@ const HomePage: React.FC = () => {
   ];
 
   const particlesInit = async (engine: any) => {
-    await loadSlim(engine); // ✅ Fixed initialization
+    await loadSlim(engine);
   };
 
   useEffect(() => {
@@ -80,6 +91,23 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentCardIndex((prev) => (prev + 1) % navCards.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (cardRef.current) {
+      gsap.fromTo(
+        cardRef.current,
+        { opacity: 0, y: 40, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power3.out" }
+      );
+    }
+  }, [currentCardIndex]);
+
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
   return (
@@ -89,31 +117,25 @@ const HomePage: React.FC = () => {
         init={particlesInit}
         options={{
           fullScreen: false,
-          background: {
-            color: {
-              value: "transparent",
-            },
-          },
+          background: { color: { value: "transparent" } },
           fpsLimit: 60,
           particles: {
-            number: {
-              value: 40,
-              density: {
-                enable: true,
-                area: 800,
-              },
+            number: { value: 50, density: { enable: true, area: 800 } },
+            color: {
+              value: ["#6366F1", "#F472B6", "#34D399", "#F59E0B"],
             },
-            color: { value: "#6366F1" },
+            shape: { type: "circle" },
             links: {
               enable: true,
-              color: "#6366F1",
-              distance: 150,
-              opacity: 0.5,
+              color: "#94A3B8",
+              distance: 130,
+              opacity: 0.4,
               width: 1,
             },
             move: {
               enable: true,
-              speed: 1.2,
+              speed: 1.5,
+              direction: "none",
               outMode: "bounce",
             },
           },
@@ -135,20 +157,30 @@ const HomePage: React.FC = () => {
           {randomQuote}
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
-          {navCards.map((card, index) => (
-            <Link
-              key={index}
-              to={card.link}
-              className={`rounded-xl shadow-lg p-6 transition-all transform hover:scale-105 hover:shadow-xl ${card.bgColor}`}
-            >
-              <div className={`text-5xl mb-4 ${card.textColor}`}>{card.icon}</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{card.title}</h2>
-              <p className="text-gray-700">{card.description}</p>
-            </Link>
-          ))}
+        <div className="flex justify-center mt-12">
+          <Link
+            to={navCards[currentCardIndex].link}
+            ref={cardRef}
+            className={`rounded-2xl shadow-xl p-8 transition-transform transform hover:scale-105 w-full max-w-md ${navCards[currentCardIndex].bgColor}`}
+          >
+            <div className={`text-6xl mb-4 ${navCards[currentCardIndex].textColor}`}>
+              {navCards[currentCardIndex].icon}
+            </div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              {navCards[currentCardIndex].title}
+            </h2>
+            <p className="text-gray-700">{navCards[currentCardIndex].description}</p>
+          </Link>
         </div>
       </div>
+
+      {/* Floating Quiz Button */}
+      <Link
+        to="/quiz"
+        className="fixed bottom-6 right-6 z-20 bg-pink-600 text-white font-semibold px-4 py-2 rounded-full shadow-lg hover:bg-pink-700 transition-all duration-300"
+      >
+        📝 Take Quiz
+      </Link>
     </div>
   );
 };
