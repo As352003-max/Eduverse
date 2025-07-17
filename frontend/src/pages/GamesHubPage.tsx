@@ -8,7 +8,7 @@ const gameCards = [
         id: 'math-maze',
         title: 'Math Maze',
         description: 'Navigate a maze by solving math problems. Test your speed and accuracy!',
-        link: '/game/mathmaze/60d5ec49f8c7a60015f6e8e1', // Placeholder Module ID
+        link: '/game/mathmaze/60d5ec49f8c7a60015f6e8e1', 
         icon: '🧠',
         bgColor: 'from-blue-400 to-blue-600'
     },
@@ -16,7 +16,7 @@ const gameCards = [
         id: 'vocab-vanguard',
         title: 'Vocab Vanguard',
         description: 'Guess the word based on definitions and hints. Improve your vocabulary!',
-        link: '/game/vocabvanguard/60d5ec49f8c7a60015f6e8e2', // Placeholder Module ID
+        link: '/game/vocabvanguard/60d5ec49f8c7a60015f6e8e2', 
         icon: '📚',
         bgColor: 'from-purple-400 to-purple-600'
     },
@@ -24,7 +24,7 @@ const gameCards = [
         id: 'logic-circuit',
         title: 'Logic Circuit Builder',
         description: 'Build digital circuits with logic gates to solve challenges. Master boolean logic!',
-        link: '/game/logiccircuit/60d5ec49f8c7a60015f6e8e3', // Placeholder Module ID
+        link: '/game/logiccircuit/60d5ec49f8c7a60015f6e8e3', 
         icon: '💡',
         bgColor: 'from-green-400 to-green-600'
     },

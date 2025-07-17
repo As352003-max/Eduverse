@@ -1,13 +1,14 @@
-// backend/models/Module.js
 const mongoose = require('mongoose');
 
 const moduleContentPieceSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    description: { type: String },
     type: {
         type: String,
-        enum: ['text', 'quiz', 'puzzle', 'simulation', 'drag-and-drop'],
+        enum: ['text', 'quiz', 'puzzle', 'simulation', 'drag-and-drop', 'video'],
         required: true,
     },
-    data: { // Flexible field to store content specific to the type (e.g., text, quiz questions)
+    data: {
         type: mongoose.Schema.Types.Mixed,
         required: true,
     },
@@ -24,6 +25,15 @@ const moduleSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    category: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    thumbnailUrl: {
+        type: String,
+        trim: true
+    },
     gradeLevel: {
         min: { type: Number, required: true, min: 1 },
         max: { type: Number, required: true, min: 1 },
@@ -32,13 +42,13 @@ const moduleSchema = new mongoose.Schema({
         type: String,
         enum: ['beginner', 'intermediate', 'advanced'],
         default: 'beginner',
+        required: true,
     },
-    content: [moduleContentPieceSchema], // Array of content pieces for the module
-    xpAward: { // XP awarded upon module completion
+    content: [moduleContentPieceSchema],
+    xpAward: {
         type: Number,
         default: 100,
     },
-    // Add other fields as needed, e.g., imageUrl, tags, prerequisites
 }, { timestamps: true });
 
 module.exports = mongoose.model('Module', moduleSchema);

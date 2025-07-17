@@ -1,8 +1,6 @@
-// frontend/src/types/index.ts (or wherever you manage your interfaces)
-
 export interface ModuleContentPiece {
-    type: 'text' | 'quiz' | 'puzzle' | 'simulation' | 'drag-and-drop';
-    data: any; // Flexible for different content types
+    type: 'text' | 'quiz' | 'puzzle' | 'simulation' | 'drag-and-drop' | 'video';
+    data: any;
 }
 
 export interface Module {
@@ -10,9 +8,11 @@ export interface Module {
     title: string;
     description: string;
     content: ModuleContentPiece[];
-    gradeLevel: { min: number; max: number }; // Added based on ModulesPage
-    difficulty: 'beginner' | 'intermediate' | 'advanced'; // Added based on ModulesPage
-    xpAward: number; // Added based on backend logic
+    gradeLevel: { min: number; max: number };
+    difficulty: 'beginner' | 'intermediate' | 'advanced';
+    xpAward: number;
+    category: string;
+    thumbnailUrl?: string;
 }
 
 export interface GameProgress {
@@ -24,7 +24,11 @@ export interface GameProgress {
     completed: boolean;
     attempts: number;
     hintsUsed: number;
-    customData: any;
+    customData: {
+        gameType: string;
+        contentIndex: number;
+        [key: string]: any;
+    };
     lastAttemptedAt: string;
 }
 
@@ -38,6 +42,18 @@ export interface User {
     totalXp?: number;
     badges?: string[];
     currentLevel?: number;
+    name?: string;
+}
+
+export interface ChildProfile {
+    _id: string;
+    parentId: string;
+    name: string;
+    avatar?: string;
+    grade?: number;
+    totalXp: number;
+    currentLevel: number;
+    badges: string[];
 }
 
 export interface LeaderboardEntry {
@@ -61,7 +77,6 @@ export interface ChatSession {
     lastActive: string;
 }
 
-// Project Interface (from previous turn, ensure it's here)
 export interface Project {
     _id: string;
     title: string;
@@ -77,4 +92,22 @@ export interface Project {
     members?: { _id: string; username: string; role: string; }[];
     createdAt: string;
     updatedAt: string;
+}
+
+export interface QuizData {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    explanation?: string;
+}
+
+export interface TextData {
+    text: string;
+    estimatedReadingTime?: number;
+}
+
+export interface VideoData {
+    url: string;
+    duration?: number;
+    thumbnailUrl?: string;
 }

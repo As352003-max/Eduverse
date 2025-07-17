@@ -1,13 +1,20 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PlayCircleIcon, PuzzlePieceIcon, RocketLaunchIcon, ArrowsRightLeftIcon, BookOpenIcon, CheckCircleIcon as CheckCircleOutlineIcon, ArrowLeftIcon, LightBulbIcon, SparklesIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
-import { CheckCircleIcon as CheckCircleSolidIcon } from '@heroicons/react/24/solid'; // For the solid checkmark
+import { PlayCircleIcon, PuzzlePieceIcon, RocketLaunchIcon, ArrowsRightLeftIcon, BookOpenIcon, ArrowLeftIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleSolidIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/solid';
 import { ModuleContentPiece, Module } from '../types';
 import apiClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { useAnalytics } from '../hooks/useAnalytics';
+
+declare global {
+    interface Window {
+        onYouTubeIframeAPIReady: () => void;
+        YT: any;
+    }
+}
 
 interface GamePageState {
     contentPiece: ModuleContentPiece;
@@ -31,118 +38,11 @@ const GamePage: React.FC = () => {
     const [loadingGameContent, setLoadingGameContent] = useState<boolean>(true);
     const [errorGameContent, setErrorGameContent] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchGameData = async () => {
-            setLoadingGameContent(true);
-            setErrorGameContent(null);
+    const youtubePlayerRef = useRef<any>(null);
+    const iframeId = useRef<string>(`Youtubeer-${Date.now()}`);
+    const [videoCompleted, setVideoCompleted] = useState<boolean>(false);
 
-            if (!user) {
-                navigate('/login');
-                toast.error('Please log in to access games.');
-                return;
-            }
-
-            if (user.role === 'parent' && !selectedChild) {
-                toast.warn('Please select a child profile before starting a game.');
-                navigate('/children');
-                trackEvent('GAME_START_BLOCKED_NO_CHILD', {
-                    moduleId,
-                    contentIndex: contentPieceIndex
-                });
-                return;
-            }
-
-            const state = location.state as GamePageState;
-
-            if (state && state.contentPiece && state.moduleTitle) {
-                setGameContent(state.contentPiece);
-                setCurrentModuleTitle(state.moduleTitle);
-                setGameStatus('playing');
-                setQuizAnswer('');
-                setQuizFeedback(null);
-                setQuizSubmitted(false);
-                setLoadingGameContent(false);
-                trackEvent('ACTIVITY_STARTED', {
-                    moduleId: moduleId,
-                    moduleTitle: state.moduleTitle,
-                    activityType: state.contentPiece.type,
-                    contentIndex: contentPieceIndex,
-                    targetProfileType: selectedChild ? 'child' : 'user',
-                    targetProfileId: selectedChild ? selectedChild._id : user?._id
-                });
-            } else if (moduleId && contentPieceIndex !== undefined) {
-                try {
-                    const moduleRes = await apiClient.get<Module>(`/modules/${moduleId}`);
-                    const module = moduleRes.data;
-                    const index = parseInt(contentPieceIndex);
-
-                    if (module && module.content && module.content[index]) {
-                        setGameContent(module.content[index]);
-                        setCurrentModuleTitle(module.title);
-                        setGameStatus('playing');
-                        setQuizAnswer('');
-                        setQuizFeedback(null);
-                        setQuizSubmitted(false);
-                        trackEvent('ACTIVITY_STARTED', {
-                            moduleId: moduleId,
-                            moduleTitle: module.title,
-                            activityType: module.content[index].type,
-                            contentIndex: contentPieceIndex,
-                            fallback: true,
-                            targetProfileType: selectedChild ? 'child' : 'user',
-                            targetProfileId: selectedChild ? selectedChild._id : user?._id
-                        });
-                    } else {
-                        const errorMessage = 'Game content not found within the module or invalid index.';
-                        setErrorGameContent(errorMessage);
-                        toast.error(errorMessage + " Returning to modules list.");
-                        navigate('/modules');
-                        trackEvent('ACTIVITY_START_FAILED', {
-                            moduleId: moduleId,
-                            contentIndex: contentPieceIndex,
-                            reason: 'Content piece not found or invalid index',
-                            error: errorMessage,
-                            targetProfileType: selectedChild ? 'child' : 'user',
-                            targetProfileId: selectedChild ? selectedChild._id : user?._id
-                        });
-                    }
-                } catch (err: any) {
-                    const errorMessage = 'Failed to load game content from backend. ' + (err.response?.data?.message || err.message || 'Server error.');
-                    setErrorGameContent(errorMessage);
-                    toast.error('Failed to load game content. Please try again.');
-                    navigate('/modules');
-                    trackEvent('ACTIVITY_START_FAILED', {
-                        moduleId: moduleId,
-                        contentIndex: contentPieceIndex,
-                        reason: 'Backend fetch failed',
-                        error: errorMessage,
-                        targetProfileType: selectedChild ? 'child' : 'user',
-                        targetProfileId: selectedChild ? selectedChild._id : user?._id
-                    });
-                } finally {
-                    setLoadingGameContent(false);
-                }
-            } else {
-                const errorMessage = 'Invalid game access. Please select a game from a module.';
-                setErrorGameContent(errorMessage);
-                toast.error(errorMessage + " Returning to modules.");
-                navigate('/modules');
-                setLoadingGameContent(false);
-                trackEvent('ACTIVITY_START_FAILED', {
-                    moduleId: moduleId,
-                    contentIndex: contentPieceIndex,
-                    reason: 'Invalid URL parameters or state',
-                    error: errorMessage,
-                    targetProfileType: selectedChild ? 'child' : 'user',
-                    targetProfileId: selectedChild ? selectedChild._id : user?._id
-                });
-            }
-        };
-
-        fetchGameData();
-    }, [location.state, moduleId, contentPieceIndex, navigate, trackEvent, user, selectedChild]);
-
-    const handleGameCompletion = useCallback(async (score: number, hintsUsed: number, completed: boolean = true) => {
+    const handleGameCompletion = useCallback(async (score: number, hintsUsed: number, completed: boolean = true, gamificationData?: { xpGain?: number, levelUp?: boolean, newLevel?: number, newBadges?: string[] }) => {
         if (!user || !moduleId || !gameContent) {
             toast.error('Please log in to save game progress.');
             trackEvent('ACTIVITY_COMPLETE_FAILED', {
@@ -163,28 +63,36 @@ const GamePage: React.FC = () => {
         const updateEndpoint = selectedChild ? `/children/${targetId}/progress` : `/users/${targetId}/progress`;
 
         try {
-            const res = await apiClient.post(updateEndpoint, {
+            const payload = {
                 moduleId: moduleId,
                 progress: completed ? 100 : 50,
                 score: score,
                 completed: completed,
                 hintsUsed: hintsUsed,
+                xpGained: gamificationData?.xpGain || 0,
+                level: gamificationData?.newLevel || 0,
+                overallProgress: gamificationData?.newLevel || 0, // Assuming overallProgress correlates with level
+                gameId: gameContent._id, // Send contentPiece _id as gameId
+                badgesEarned: gamificationData?.newBadges || [],
                 customData: {
-                    gameType: gameContent?.type,
+                    gameType: gameContent.type,
                     contentIndex: contentPieceIndex,
                 },
-            });
+            };
+
+            const res = await apiClient.post(updateEndpoint, payload);
             setGameStatus('completed');
-            const gamification = res.data.gamification;
+            const backendGamification = res.data.gamification || {};
+
             let message = res.data.message || 'Progress Updated!';
-            if (gamification.xpGain) {
-                message += ` (+${gamification.xpGain} XP)`;
+            if (backendGamification.xpGain) {
+                message += ` (+${backendGamification.xpGain} XP)`;
             }
-            if (gamification.levelUp) {
-                message += ` 🎉 Level Up to ${gamification.newLevel}!`;
+            if (backendGamification.levelUp) {
+                message += ` 🎉 Level Up to ${backendGamification.newLevel}!`;
             }
-            if (gamification.newBadges && gamification.newBadges.length > 0) {
-                message += ` 🏆 New Badge: ${gamification.newBadges.join(', ')}!`;
+            if (backendGamification.newBadges && backendGamification.newBadges.length > 0) {
+                message += ` 🏆 New Badge: ${backendGamification.newBadges.join(', ')}!`;
             }
             toast.success(message, { autoClose: 5000 });
 
@@ -196,9 +104,9 @@ const GamePage: React.FC = () => {
                 score: score,
                 hintsUsed: hintsUsed,
                 isCompleted: completed,
-                xpGain: gamification.xpGain,
-                levelUp: gamification.levelUp,
-                newBadges: gamification.newBadges,
+                xpGain: backendGamification.xpGain,
+                levelUp: backendGamification.levelUp,
+                newBadges: backendGamification.newBadges,
                 targetProfileType: selectedChild ? 'child' : 'user',
                 targetProfileId: targetId
             });
@@ -221,36 +129,205 @@ const GamePage: React.FC = () => {
         }
     }, [moduleId, contentPieceIndex, user, gameContent, currentModuleTitle, selectedChild, trackEvent]);
 
-    const handleQuizSubmit = () => {
-        if (gameContent?.type === 'quiz' && quizAnswer.trim() && !quizSubmitted) {
-            const isCorrect = quizAnswer.trim().toLowerCase() === gameContent.data.correctAnswer.toLowerCase();
-            setQuizSubmitted(true);
-            if (isCorrect) {
-                setQuizFeedback('Correct! 🎉');
-                handleGameCompletion(100, 0, true);
-                trackEvent('QUIZ_SUBMITTED', {
+    const onPlayerStateChange = useCallback((event: any) => {
+        if (event.data === window.YT.PlayerState.ENDED) {
+            if (!videoCompleted) {
+                setVideoCompleted(true);
+                handleGameCompletion(100, 0, true, { xpGain: 50, levelUp: false, newBadges: [] }); // Example XP for video
+                trackEvent('VIDEO_COMPLETED', {
                     moduleId: moduleId,
                     contentIndex: contentPieceIndex,
-                    isCorrect: true,
-                    answer: quizAnswer.trim(),
-                    score: 100,
-                    targetProfileType: selectedChild ? 'child' : 'user',
-                    targetProfileId: selectedChild ? selectedChild._id : user?._id
-                });
-            } else {
-                setQuizFeedback(`Incorrect. The correct answer was: "${gameContent.data.correctAnswer}"`);
-                handleGameCompletion(0, 0, false);
-                trackEvent('QUIZ_SUBMITTED', {
-                    moduleId: moduleId,
-                    contentIndex: contentPieceIndex,
-                    isCorrect: false,
-                    answer: quizAnswer.trim(),
-                    correctAnswer: gameContent.data.correctAnswer,
-                    score: 0,
+                    videoTitle: gameContent?.title,
                     targetProfileType: selectedChild ? 'child' : 'user',
                     targetProfileId: selectedChild ? selectedChild._id : user?._id
                 });
             }
+        }
+    }, [videoCompleted, handleGameCompletion, moduleId, contentPieceIndex, gameContent, selectedChild, user, trackEvent]);
+
+
+    useEffect(() => {
+        const fetchGameData = async () => {
+            setLoadingGameContent(true);
+            setErrorGameContent(null);
+
+            if (!user) {
+                navigate('/login');
+                toast.error('Please log in to access games.');
+                return;
+            }
+
+            if (user.role === 'parent' && !selectedChild) {
+                toast.warn('Please select a child profile before starting a game.');
+                navigate('/children');
+                trackEvent('GAME_START_BLOCKED_NO_CHILD', {
+                    moduleId,
+                    contentIndex: contentPieceIndex
+                });
+                return;
+            }
+
+            const state = location.state as GamePageState;
+            let currentContentPiece: ModuleContentPiece | null = null;
+            let currentModuleTitleFromFetch: string = '';
+
+            if (state && state.contentPiece && state.moduleTitle) {
+                currentContentPiece = state.contentPiece;
+                currentModuleTitleFromFetch = state.moduleTitle;
+            } else if (moduleId && contentPieceIndex !== undefined) {
+                try {
+                    const moduleRes = await apiClient.get<Module>(`/modules/${moduleId}`);
+                    const module = moduleRes.data;
+                    const index = parseInt(contentPieceIndex);
+
+                    if (module && module.content && module.content[index]) {
+                        currentContentPiece = module.content[index];
+                        currentModuleTitleFromFetch = module.title;
+                    } else {
+                        const errorMessage = 'Game content not found within the module or invalid index.';
+                        setErrorGameContent(errorMessage);
+                        toast.error(errorMessage + " Returning to modules list.");
+                        navigate('/modules');
+                        trackEvent('ACTIVITY_START_FAILED', {
+                            moduleId: moduleId,
+                            contentIndex: contentPieceIndex,
+                            reason: 'Content piece not found or invalid index',
+                            error: errorMessage,
+                            targetProfileType: selectedChild ? 'child' : 'user',
+                            targetProfileId: selectedChild ? selectedChild._id : user?._id
+                        });
+                        return;
+                    }
+                } catch (err: any) {
+                    const errorMessage = 'Failed to load game content from backend. ' + (err.response?.data?.message || err.message || 'Server error.');
+                    setErrorGameContent(errorMessage);
+                    toast.error('Failed to load game content. Please try again.');
+                    navigate('/modules');
+                    trackEvent('ACTIVITY_START_FAILED', {
+                        moduleId: moduleId,
+                        contentIndex: contentPieceIndex,
+                        reason: 'Backend fetch failed',
+                        error: errorMessage,
+                        targetProfileType: selectedChild ? 'child' : 'user',
+                        targetProfileId: selectedChild ? selectedChild._id : user?._id
+                    });
+                    return;
+                }
+            } else {
+                const errorMessage = 'Invalid game access. Please select a game from a module.';
+                setErrorGameContent(errorMessage);
+                toast.error(errorMessage + " Returning to modules.");
+                navigate('/modules');
+                setLoadingGameContent(false);
+                trackEvent('ACTIVITY_START_FAILED', {
+                    moduleId: moduleId,
+                    contentIndex: contentPieceIndex,
+                    reason: 'Invalid URL parameters or state',
+                    error: errorMessage,
+                    targetProfileType: selectedChild ? 'child' : 'user',
+                    targetProfileId: selectedChild ? selectedChild._id : user?._id
+                });
+                return;
+            }
+
+            setGameContent(currentContentPiece);
+            setCurrentModuleTitle(currentModuleTitleFromFetch);
+            setGameStatus('playing');
+            setQuizAnswer('');
+            setQuizFeedback(null);
+            setQuizSubmitted(false);
+            setVideoCompleted(false);
+            setLoadingGameContent(false);
+
+            trackEvent('ACTIVITY_STARTED', {
+                moduleId: moduleId,
+                moduleTitle: currentModuleTitleFromFetch,
+                activityType: currentContentPiece?.type,
+                contentIndex: contentPieceIndex,
+                targetProfileType: selectedChild ? 'child' : 'user',
+                targetProfileId: selectedChild ? selectedChild._id : user?._id,
+                source: state ? 'state_prop' : 'backend_fetch'
+            });
+
+            if (currentContentPiece?.type === 'video' && window.YT && window.YT.Player) {
+                const videoIdMatch = currentContentPiece.data.url.match(/embed\/([a-zA-Z0-9_-]+)/);
+                if (videoIdMatch && videoIdMatch[1]) {
+                    if (youtubePlayerRef.current) {
+                        youtubePlayerRef.current.destroy();
+                        youtubePlayerRef.current = null;
+                    }
+
+                    youtubePlayerRef.current = new window.YT.Player(iframeId.current, {
+                        videoId: videoIdMatch[1],
+                        playerVars: {
+                            'autoplay': 0,
+                            'controls': 1,
+                            'rel': 0,
+                            'modestbranding': 1,
+                            'enablejsapi': 1,
+                            'origin': window.location.origin
+                        },
+                        events: {
+                            'onReady': (e: any) => console.log('YouTube Player Ready'),
+                            'onStateChange': onPlayerStateChange,
+                            'onError': (e: any) => console.error('YouTube Player Error:', e)
+                        }
+                    });
+                } else {
+                    console.error("Invalid YouTube URL format:", currentContentPiece.data.url);
+                    toast.error("Could not load video player. Invalid YouTube URL.");
+                }
+            }
+        };
+
+        if (gameContent?.type === 'video' && !window.YT && !document.getElementById('youtube-iframe-api-script')) {
+            const tag = document.createElement('script');
+            tag.id = 'youtube-iframe-api-script';
+            tag.src = 'http://www.youtube.com/iframe_api'; // Correct YouTube API URL
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            if (firstScriptTag && firstScriptTag.parentNode) {
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            } else {
+                document.head.appendChild(tag);
+            }
+        }
+
+        if (!window.onYouTubeIframeAPIReady) {
+            window.onYouTubeIframeAPIReady = fetchGameData;
+        } else {
+            fetchGameData();
+        }
+
+        return () => {
+            if (youtubePlayerRef.current) {
+                youtubePlayerRef.current.destroy();
+                youtubePlayerRef.current = null;
+            }
+        };
+
+    }, [location.state, moduleId, contentPieceIndex, navigate, trackEvent, user, selectedChild, onPlayerStateChange, gameContent?.type]); // Add gameContent.type to dependencies
+
+    const handleQuizSubmit = () => {
+        if (gameContent?.type === 'quiz' && quizAnswer.trim() && !quizSubmitted) {
+            const isCorrect = quizAnswer.trim().toLowerCase() === gameContent.data.correctAnswer.toLowerCase();
+            setQuizSubmitted(true);
+            const score = isCorrect ? 100 : 0;
+            const xpGain = isCorrect ? 30 : 0; // Example XP for quiz
+            const newBadges = isCorrect ? ['QuizMaster'] : []; // Example badge for quiz
+
+            setQuizFeedback(isCorrect ? 'Correct! 🎉' : `Incorrect. The correct answer was: "${gameContent.data.correctAnswer}"`);
+            handleGameCompletion(score, 0, isCorrect, { xpGain, newBadges });
+
+            trackEvent('QUIZ_SUBMITTED', {
+                moduleId: moduleId,
+                contentIndex: contentPieceIndex,
+                isCorrect: isCorrect,
+                answer: quizAnswer.trim(),
+                ...(isCorrect ? {} : { correctAnswer: gameContent.data.correctAnswer }),
+                score: score,
+                targetProfileType: selectedChild ? 'child' : 'user',
+                targetProfileId: selectedChild ? selectedChild._id : user?._id
+            });
         }
     };
 
@@ -302,6 +379,7 @@ const GamePage: React.FC = () => {
             case 'simulation': return <RocketLaunchIcon className="h-12 w-12 text-yellow-600" />;
             case 'drag-and-drop': return <ArrowsRightLeftIcon className="h-12 w-12 text-red-600" />;
             case 'text': return <BookOpenIcon className="h-12 w-12 text-purple-600" />;
+            case 'video': return <PlayIcon className="h-12 w-12 text-teal-600" />;
             default: return <PlayCircleIcon className="h-12 w-12 text-gray-600" />;
         }
     };
@@ -364,7 +442,7 @@ const GamePage: React.FC = () => {
                                 <h3 className="text-xl font-semibold mb-3">Reading:</h3>
                                 <p className="mb-6">{gameContent.data.text}</p>
                                 <button
-                                    onClick={() => handleGameCompletion(0, 0, true)}
+                                    onClick={() => handleGameCompletion(100, 0, true, { xpGain: 10, levelUp: false, newBadges: [] })} // Example XP for text
                                     className="mt-6 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                                     disabled={loadingProgressUpdate}
                                 >
@@ -420,6 +498,44 @@ const GamePage: React.FC = () => {
                             </div>
                         )}
 
+                        {gameContent.type === 'video' && (
+                            <div>
+                                <h3 className="text-xl font-semibold mb-3 flex items-center">
+                                    <PlayIcon className="h-6 w-6 mr-2 text-teal-600" /> Video: {gameContent.title}
+                                </h3>
+                                <p className="text-gray-700 mb-4">{gameContent.data.description || 'Watch this educational video.'}</p>
+                                <div className="aspect-w-16 aspect-h-9 w-full bg-black rounded-lg overflow-hidden shadow-inner">
+                                    <iframe
+                                        id={iframeId.current}
+                                        src={gameContent.data.url}
+                                        title={gameContent.title}
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    ></iframe>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (!videoCompleted) {
+                                            setVideoCompleted(true);
+                                            handleGameCompletion(100, 0, true, { xpGain: 50, levelUp: false, newBadges: [] });
+                                            toast.info('Video manually marked as completed.');
+                                        }
+                                    }}
+                                    className="mt-6 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={loadingProgressUpdate || videoCompleted}
+                                >
+                                    {loadingProgressUpdate ? 'Saving...' : videoCompleted ? 'Video Completed!' : 'Mark as Watched (Manual)'}
+                                </button>
+                                {!videoCompleted && (
+                                    <p className="text-sm text-gray-500 mt-2">
+                                        The video will auto-complete when watched. Click "Mark as Watched" if needed.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {gameContent.type === 'puzzle' && (
                             <div>
                                 <h3 className="text-xl font-semibold mb-3 flex items-center">
@@ -430,7 +546,7 @@ const GamePage: React.FC = () => {
                                     <p>This is where you would integrate your interactive puzzle component.</p>
                                 </div>
                                 <button
-                                    onClick={() => handleGameCompletion(100, 0)}
+                                    onClick={() => handleGameCompletion(100, 0, true, { xpGain: 75, levelUp: false, newBadges: ['PuzzleSolver'] })} // Example XP/badge for puzzle
                                     className="mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                                     disabled={loadingProgressUpdate}
                                 >
@@ -449,30 +565,11 @@ const GamePage: React.FC = () => {
                                     <p>This is where you would integrate your simulation component (e.g., a Canvas for Three.js/D3.js).</p>
                                 </div>
                                 <button
-                                    onClick={() => handleGameCompletion(100, 0)}
+                                    onClick={() => handleGameCompletion(100, 0, true, { xpGain: 100, levelUp: true, newLevel: (user?.currentLevel || 0) + 1, newBadges: ['SimulatorPro'] })} // Example XP/badge/level for simulation
                                     className="mt-6 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                                     disabled={loadingProgressUpdate}
                                 >
-                                    {loadingProgressUpdate ? 'Saving...' : 'Simulate Simulation Run'}
-                                </button>
-                            </div>
-                        )}
-
-                        {gameContent.type === 'drag-and-drop' && (
-                            <div>
-                                <h3 className="text-xl font-semibold mb-3 flex items-center">
-                                    <ArrowsRightLeftIcon className="h-6 w-6 mr-2 text-red-600" /> Drag-and-Drop: {gameContent.data.activityName}
-                                </h3>
-                                <p className="text-gray-700 mb-4">{gameContent.data.description}</p>
-                                <div className="bg-white border border-gray-300 p-8 rounded-lg shadow-inner text-center text-gray-500 italic h-48 flex items-center justify-center">
-                                    <p>This is where you would integrate your interactive drag-and-drop component.</p>
-                                </div>
-                                <button
-                                    onClick={() => handleGameCompletion(100, 0)}
-                                    className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
-                                    disabled={loadingProgressUpdate}
-                                >
-                                    {loadingProgressUpdate ? 'Saving...' : 'Simulate Drag-and-Drop Complete'}
+                                    {loadingProgressUpdate ? 'Saving...' : 'Simulate Simulation Completion'}
                                 </button>
                             </div>
                         )}

@@ -53,6 +53,7 @@ router.get('/role/:roleName', protect, async (req, res) => {
             role: u.role,
             totalXp: u.totalXp,
             currentLevel: u.currentLevel,
+            badges: u.badges,
             ...(u.role === 'student' && u.grade && { grade: u.grade }),
         }));
         res.status(200).json(filtered);
@@ -148,7 +149,11 @@ router.delete('/:id', protect, authorizeRoles('admin'), async (req, res) => {
 router.post('/:id/progress', protect, async (req, res) => {
     try {
         const { id } = req.params;
-        const { gameId, score, level, overallProgress, xpGained, badgesEarned } = req.body;
+        const score = Number(req.body.score) || 0;
+        const level = Number(req.body.level) || 0;
+        const overallProgress = Number(req.body.overallProgress) || 0;
+        const xpGained = Number(req.body.xpGained) || 0;
+        const { gameId, badgesEarned } = req.body;
 
         let profile = await User.findById(id);
 
@@ -167,7 +172,7 @@ router.post('/:id/progress', protect, async (req, res) => {
         profile.gameProgress[gameId].currentLevel = Math.max(profile.gameProgress[gameId].currentLevel || 0, level);
 
         profile.totalXp = (profile.totalXp || 0) + xpGained;
-        profile.currentLevel = Math.max(profile.currentLevel || 0, overallProgress); 
+        profile.currentLevel = Math.max(profile.currentLevel || 0, overallProgress);
 
         if (badgesEarned && Array.isArray(badgesEarned)) {
             if (!profile.badges) {
@@ -205,6 +210,9 @@ router.post('/:id/progress', protect, async (req, res) => {
 
     } catch (error) {
         console.error('Error updating progress:', error);
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Validation error updating progress', errors: error.errors });
+        }
         res.status(500).json({ message: 'Failed to update progress', error: error.message });
     }
 });

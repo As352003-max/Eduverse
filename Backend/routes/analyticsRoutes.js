@@ -1,46 +1,15 @@
-// Backend/routes/analyticsRoutes.js
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const AnalyticsEvent = require('../models/AnalyticsEvent');
+
+const analyticsController = require('../controllers/analyticsController');
 const { protect } = require('../middleware/authMiddleware');
+
 const User = require('../models/User');
 const GameProgress = require('../models/GameProgress');
 const Module = require('../models/Module');
 
-router.post('/event', protect, async (req, res) => {
-    const { eventName, eventData } = req.body;
-    const initiatedByUserId = req.user ? req.user._id : null;
-
-    const targetProfileType = eventData?.targetProfileType;
-    const targetProfileId = eventData?.targetProfileId;
-
-    if (!eventName) {
-        return res.status(400).json({ message: 'Event name is required.' });
-    }
-
-    try {
-        const newEvent = new AnalyticsEvent({
-            eventName,
-            profile: {
-                id: targetProfileId,
-                kind: targetProfileType || 'Anonymous'
-            },
-            eventData: eventData || {},
-            ipAddress: req.ip,
-            initiatedByUserId
-        });
-
-        await newEvent.save();
-        res.status(201).json({ message: 'Analytics event logged successfully.' });
-    } catch (error) {
-        console.error('Error logging analytics event:', error.message);
-        res.status(500).json({
-            message: 'Failed to log analytics event.',
-            error: process.env.NODE_ENV === 'production' ? null : error.message
-        });
-    }
-});
+router.post('/event', protect, analyticsController.trackEvent);
 
 router.get('/student/:userId', protect, async (req, res) => {
     const { userId } = req.params;
@@ -70,6 +39,7 @@ router.get('/student/:userId', protect, async (req, res) => {
         }
 
         const studentProgress = await GameProgress.find({ userId: student._id });
+
         const totalModulesAttempted = studentProgress.length;
         const modulesCompleted = studentProgress.filter(p => p.completed).length;
         const totalAvailableModules = await Module.countDocuments();
@@ -111,7 +81,7 @@ router.get('/student/:userId', protect, async (req, res) => {
     } catch (error) {
         console.error('Error fetching student analytics:', error);
         if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid User ID format.' });
+            return res.status(400).json({ message: 'Invalid User ID format provided.' });
         }
         res.status(500).json({ message: 'Server error fetching student analytics.', error: error.message });
     }

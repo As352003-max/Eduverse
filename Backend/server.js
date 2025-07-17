@@ -5,6 +5,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 dotenv.config();
 
@@ -19,10 +20,11 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
 
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('CORS Not Allowed'));
+            callback(new Error(`CORS Not Allowed for origin: ${origin}`));
         }
     },
     credentials: true,
@@ -30,6 +32,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(helmet());
 
 app.use((req, res, next) => {
     const start = Date.now();
@@ -51,7 +54,9 @@ module.exports.io = io;
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+    });
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -82,7 +87,6 @@ const userRoutes = require('./routes/userRoutes');
 const aiChatRoutes = require('./routes/aiChatRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const childRoutes = require('./routes/childRoutes');
-
 const mathMazeRoutes = require('./routes/mathMazeRoutes');
 const vocabVanguardRoutes = require('./routes/vocabVanguardRoutes');
 const logicCircuitRoutes = require('./routes/logicCircuitRoutes');
@@ -97,15 +101,16 @@ app.use('/api/users', userRoutes);
 app.use('/api/ai-chat', aiChatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/children', childRoutes);
-
 app.use('/api/game/mathmaze', mathMazeRoutes);
 app.use('/api/game/vocabvanguard', vocabVanguardRoutes);
 app.use('/api/game/logiccircuit', logicCircuitRoutes);
 
-
 app.get('/', (req, res) => {
     res.send('Eduverse Backend API is running!');
 });
+
+const { errorHandler } = require('./middleware/errorMiddleware');
+app.use(errorHandler);
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
