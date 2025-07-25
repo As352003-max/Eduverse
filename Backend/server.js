@@ -86,6 +86,9 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const aiChatRoutes = require('./routes/aiChatRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const learningModuleRoutes = require('./routes/learningModuleRoutes');
+const progressRoutes = require('./routes/progressRoutes'); // Ensure this is imported
+
 const childRoutes = require('./routes/childRoutes');
 const mathMazeRoutes = require('./routes/mathMazeRoutes');
 const vocabVanguardRoutes = require('./routes/vocabVanguardRoutes');
@@ -104,6 +107,8 @@ app.use('/api/children', childRoutes);
 app.use('/api/game/mathmaze', mathMazeRoutes);
 app.use('/api/game/vocabvanguard', vocabVanguardRoutes);
 app.use('/api/game/logiccircuit', logicCircuitRoutes);
+app.use('/api/learning-modules', learningModuleRoutes);
+app.use('/api/progress', progressRoutes); // Ensure this line is present and correctly placed
 
 app.get('/', (req, res) => {
     res.send('Eduverse Backend API is running!');

@@ -28,6 +28,14 @@ const gameCards = [
         icon: '💡',
         bgColor: 'from-green-400 to-green-600'
     },
+     {
+        id: 'shadow-match',
+        title: 'Shadow Match Game',
+        description: 'Match items with their correct shadows! Improve visual recognition and memory!',
+        link: '/shadow-game/0',
+        icon: '🌟',
+        bgColor: 'from-yellow-400 to-yellow-600'
+    }
 ];
 
 const GamesHubPage: React.FC = () => {

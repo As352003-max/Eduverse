@@ -9,22 +9,30 @@ const userSchema = new mongoose.Schema({
         required: function() {
             return this.authType === 'email_password';
         },
-        minlength: 6
+        minlength: 6,
+        select: false
     },
-    firebaseId: { type: String, unique: true, sparse: true },
+    firebaseId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
     authType: {
         type: String,
         enum: ['email_password', 'firebase'],
-        default: 'email_password'
+        default: 'email_password',
+        required: true
     },
     role: { type: String, enum: ['student', 'teacher', 'parent', 'admin'], default: 'student' },
     grade: { type: Number, min: 5, max: 10 },
     parent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     totalXp: { type: Number, default: 0 },
-    badges: [{ type: String }],
+    badges: [{ type: String }], // For specific badge achievements
     currentLevel: { type: Number, default: 1 },
     lastLogin: { type: Date, default: Date.now },
-}, { timestamps: true });
+}, {
+    timestamps: true
+});
 
 userSchema.pre('save', async function (next) {
     if (this.isModified('password') && this.authType === 'email_password') {

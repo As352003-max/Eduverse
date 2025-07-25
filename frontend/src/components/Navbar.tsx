@@ -15,7 +15,7 @@ import {
     RectangleStackIcon,
     PuzzlePieceIcon
 } from '@heroicons/react/24/outline';
-
+import { CursorArrowRaysIcon } from "@heroicons/react/24/outline";
 const Navbar: React.FC = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -56,6 +56,13 @@ const Navbar: React.FC = () => {
                         <Link to="/modules" className="flex items-center hover:text-yellow-300 px-3 py-2 rounded-lg transition">
                             <BookOpenIcon className="h-5 w-5 mr-1" /> Modules
                         </Link>
+                                 <Link
+  to="/newmodules"
+  className="flex items-center text-white-700 hover:text-indigo-600 px-3 py-2 rounded-lg transition"
+>
+  <CursorArrowRaysIcon className="h-5 w-5 mr-1" />
+  Interactive Content
+</Link>
                         <Link to="/games" className="flex items-center hover:text-yellow-300 px-3 py-2 rounded-lg transition">
                             <PuzzlePieceIcon className="h-5 w-5 mr-1" /> Games
                         </Link>

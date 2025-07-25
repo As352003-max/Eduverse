@@ -1,26 +1,29 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'  
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
 import 'animate.css';
 import { AuthProvider } from './context/AuthContext.tsx';
-import { BrowserRouter as Router } from 'react-router-dom'; // Import BrowserRouter here
+import { BrowserRouter } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import "antd/dist/reset.css";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <Router> {/* This is the ONE and ONLY Router */}
-      <AuthProvider>
-        {/* SocketProvider should be inside Router if it uses React Router hooks,
-            but outside AuthProvider if AuthProvider depends on SocketProvider,
-            or if SocketProvider needs auth context.
-            Based on previous code, SocketProvider uses useAuth, so it should be inside AuthProvider.
-            The AppContent (which contains SocketProvider) is now directly rendered by App.
-        */}
-        <App />
-        <ToastContainer position="bottom-right" autoClose={5000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
-      </AuthProvider>
-    </Router>
-  </React.StrictMode>,
-)
+
+const rootElement = document.getElementById('root');
+
+// Add a check to ensure the root element exists
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AuthProvider>
+          <App />
+          <ToastContainer position="bottom-right" autoClose={5000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
+        </AuthProvider>
+      </BrowserRouter>
+    </React.StrictMode>,
+  );
+} else {
+  console.error("Root element with ID 'root' not found in the document.");
+}

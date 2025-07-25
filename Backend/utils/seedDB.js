@@ -1,4 +1,3 @@
-// backend/utils/seedDB.js
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
@@ -8,11 +7,14 @@ dotenv.config();
 
 // Import Models
 const User = require('../models/User');
-const Module = require('../models/Module');
+// Ensure you are importing the correct model name for your modules,
+// whether it's 'Module' or 'LearningModule'.
+// Based on your last block, it seems you intend to use 'LearningModule'.
+const LearningModule = require('../models/LearningModule');
 const GameProgress = require('../models/GameProgress');
-const ChatSession = require('../models/ChatSession'); // If you want to clear chat sessions too
-const Project = require('../models/Project'); // If you want to clear projects too
-const Reward = require('../models/Reward'); // Assuming you have a Reward model for badges
+const ChatSession = require('../models/ChatSession');
+const Project = require('../models/Project');
+const Reward = require('../models/Reward');
 
 const seedDatabase = async () => {
     try {
@@ -22,7 +24,8 @@ const seedDatabase = async () => {
         // --- 1. Clear existing data ---
         console.log('Clearing existing data...');
         await User.deleteMany({});
-        await Module.deleteMany({});
+        // Clear the correct module collection
+        await LearningModule.deleteMany({});
         await GameProgress.deleteMany({});
         await ChatSession.deleteMany({});
         await Project.deleteMany({});
@@ -69,59 +72,133 @@ const seedDatabase = async () => {
 
         console.log('Sample users created.');
 
-        // --- 3. Create Modules with various content types ---
-        console.log('Creating sample modules...');
+        // --- 3. Create Learning Modules with the new 'topics' structure ---
+        console.log('Creating sample learning modules...');
 
-        const module1 = await Module.create({
-            title: 'Introduction to AI',
-            description: 'Learn the basics of Artificial Intelligence and its applications.',
-            gradeLevel: { min: 7, max: 9 },
-            difficulty: 'beginner',
-            xpAward: 150,
-            content: [
-                { type: 'text', data: { text: 'Artificial Intelligence (AI) is a broad field of computer science that gives computers the ability to perform human-like tasks such as learning, problem-solving, and decision-making. It encompasses machine learning, deep learning, natural language processing, and more.' } },
-                { type: 'quiz', data: {
-                    question: 'What does AI stand for?',
-                    options: ['Artificial Intelligence', 'Automated Information', 'Advanced Integration'],
-                    correctAnswer: 'Artificial Intelligence'
-                }},
-                { type: 'text', data: { text: 'AI is used in everyday life, from recommendation systems on streaming platforms to voice assistants like Siri and Alexa. It powers self-driving cars, medical diagnostics, and fraud detection.' } }
+        const learningModule1 = await LearningModule.create({
+            title: 'Foundations of AI',
+            description: 'Learn the very basics of Artificial Intelligence through interactive lessons for beginners.',
+            gradeLevel: { min: 1, max: 3 },
+            xpAward: 120,
+            thumbnailUrl: "https://example.com/thumbnails/ai_beginner.jpg",
+            topics: [
+                {
+                    title: 'What is AI?',
+                    level: 'beginner',
+                    content: [
+                        {
+                            title: 'Introduction to AI Text',
+                            type: 'text',
+                            data: { text: 'Artificial Intelligence (AI) is when computers can think and learn like people. It helps computers solve problems, understand language, and even see things! Think of smart assistants or games that learn as you play.' }
+                        },
+                        {
+                            title: 'AI Basic Concepts Video',
+                            type: 'video',
+                            data: {
+                                url: 'https://www.youtube.com/watch?v=JmlYs0s2WlQ', // Example beginner-friendly AI video
+                                duration: '03:15',
+                                description: 'A short video explaining AI in simple terms for kids.'
+                            }
+                        },
+                        {
+                            title: 'AI Introduction Quiz',
+                            type: 'quiz',
+                            data: {
+                                question: 'What does AI stand for?',
+                                options: ['Artificial Information', 'Automated Intelligence', 'Artificial Intelligence', 'Advanced Interaction'],
+                                correctAnswer: 'Artificial Intelligence'
+                            }
+                        }
+                    ]
+                }
             ]
         });
 
-        const module2 = await Module.create({
-            title: 'Machine Learning Fundamentals',
-            description: 'Dive into the core concepts of Machine Learning algorithms.',
-            gradeLevel: { min: 8, max: 10 },
-            difficulty: 'intermediate',
-            xpAward: 200,
-            content: [
-                { type: 'text', data: { text: 'Machine Learning (ML) is a subset of AI that enables systems to learn from data without being explicitly programmed. It involves building models that can make predictions or decisions based on patterns identified in data.' } },
-                { type: 'puzzle', data: { puzzleName: 'Algorithm Sort', description: 'Drag and drop the algorithms into their correct categories (Supervised, Unsupervised, Reinforcement).' } },
-                { type: 'text', data: { text: 'Common ML algorithms include Linear Regression, Decision Trees, Support Vector Machines, and K-Means Clustering.' } }
+        const learningModule2 = await LearningModule.create({
+            title: 'Machine Learning Basics',
+            description: 'Explore fundamental concepts of Machine Learning, how machines learn from data.',
+            gradeLevel: { min: 4, max: 6 },
+            xpAward: 180,
+            thumbnailUrl: "https://example.com/thumbnails/ml_intermediate.jpg",
+            topics: [
+                {
+                    title: 'How Machines Learn',
+                    level: 'intermediate',
+                    content: [
+                        {
+                            title: 'Machine Learning Introduction Text',
+                            type: 'text',
+                            data: { text: 'Machine Learning is a part of AI where computers learn from examples, instead of being told exactly what to do. They find patterns in data to make predictions or decisions. For instance, an ML model can learn to recognize cats after seeing many cat pictures.' }
+                        },
+                        {
+                            title: 'Code.org - How Machines Learn',
+                            type: 'video',
+                            data: {
+                                url: 'https://www.youtube.com/watch?v=R9OHn5ZF4Uo', // Example Code.org ML video
+                                duration: '05:30',
+                                description: 'Explains how computers learn from data, make predictions, and improve over time using examples like sorting photos or playing games.'
+                            }
+                        },
+                        {
+                            title: 'ML Concepts Quiz',
+                            type: 'quiz',
+                            data: {
+                                question: 'What is a key way Machine Learning differs from traditional programming?',
+                                options: ['It uses more complex math', 'It learns from data', 'It runs faster', 'It requires less memory'],
+                                correctAnswer: 'It learns from data'
+                            }
+                        }
+                    ]
+                }
             ]
         });
 
-        const module3 = await Module.create({
-            title: 'Neural Networks & Deep Learning',
-            description: 'Explore the fascinating world of neural networks and deep learning.',
-            gradeLevel: { min: 9, max: 12 },
-            difficulty: 'advanced',
+        const learningModule3 = await LearningModule.create({
+            title: 'Deep Learning & Neural Networks',
+            description: 'Dive into advanced AI topics like Deep Learning and how Neural Networks function.',
+            gradeLevel: { min: 7, max: 10 },
             xpAward: 250,
-            content: [
-                { type: 'text', data: { text: 'Deep Learning is a specialized branch of ML that uses artificial neural networks with multiple layers to learn complex patterns from data. It has revolutionized areas like image recognition and natural language processing.' } },
-                { type: 'simulation', data: { simulationName: 'Neural Network Training', description: 'Simulate the training process of a simple neural network and observe how weights are adjusted.' } },
-                { type: 'drag-and-drop', data: { activityName: 'Layer Connection', description: 'Connect the input, hidden, and output layers of a neural network.' } }
+            thumbnailUrl: "https://example.com/thumbnails/deep_learning_advanced.jpg",
+            topics: [
+                {
+                    title: 'Introduction to Neural Networks',
+                    level: 'advanced',
+                    content: [
+                        {
+                            title: 'Deep Learning Overview Text',
+                            type: 'text',
+                            data: { text: 'Deep Learning uses layers of artificial neural networks, inspired by the human brain, to process complex patterns in data. This technology powers things like face recognition, speech translation, and self-driving cars.' }
+                        },
+                        {
+                            title: 'Neural Networks Explained',
+                            type: 'video',
+                            data: {
+                                url: 'https://www.youtube.com/watch?v=aircA Ruiz_E', // Example Neural Network explanation video
+                                duration: '07:00',
+                                description: 'Explains how neural networks are inspired by the human brain and how they help machines learn patterns and make decisions.'
+                            }
+                        },
+                        {
+                            title: 'Deep Learning Quiz',
+                            type: 'quiz',
+                            data: {
+                                question: 'What biological system inspires Neural Networks?',
+                                options: ['The human heart', 'The human brain', 'Plant roots', 'Bird wings'],
+                                correctAnswer: 'The human brain'
+                            }
+                        }
+                    ]
+                }
             ]
         });
 
-        console.log('Sample modules created.');
+        console.log('Sample learning modules created.');
 
-        // --- 4. Create Game Progress ---
+        // --- 4. Create Game Progress (Adjusted for LearningModule structure) ---
         console.log('Creating sample game progress...');
         await GameProgress.create({
             userId: studentUser._id,
-            moduleId: module1._id,
+            moduleId: learningModule1._id, // Link to the new LearningModule's ID
             progress: 100,
             score: 95,
             completed: true,
@@ -133,7 +210,7 @@ const seedDatabase = async () => {
 
         await GameProgress.create({
             userId: studentUser._id,
-            moduleId: module2._id,
+            moduleId: learningModule2._id,
             progress: 60,
             score: 0,
             completed: false,
@@ -150,7 +227,7 @@ const seedDatabase = async () => {
             name: 'First Completion',
             description: 'Awarded for completing your first module.',
             type: 'badge',
-            moduleCompletion: null, // This badge is generic
+            moduleCompletion: null,
         });
         await Reward.create({
             name: 'Quiz Master',
@@ -160,12 +237,11 @@ const seedDatabase = async () => {
         });
         await Reward.create({
             name: 'AI Explorer',
-            description: 'Awarded for completing the "Introduction to AI" module.',
+            description: 'Awarded for completing the "Foundations of AI" module.',
             type: 'badge',
-            moduleCompletion: module1._id, // Specific module completion badge
+            moduleCompletion: learningModule1._id, // Specific module completion badge
         });
         console.log('Sample rewards created.');
-
 
         console.log('Database seeding complete!');
     } catch (error) {
