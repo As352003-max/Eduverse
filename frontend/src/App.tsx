@@ -8,6 +8,10 @@ import Navbar from './components/Navbar';
 import NotificationToasts from './components/NotificationToasts';
 import ShadowMatchGame from './components/game2';
 import ErrorBoundary from './pages/ErrorBoundary';
+import ModulesPage from './pages/ModulesPage';
+import ModuleDetailPage from './pages/ModuleDetailPage';
+import NewModuleQuizPage from './pages/NewModuleQuizPage';
+ // <-- fixed import path
 import VideoPage from './pages/VideoPage';
 import AuthLoadingPage from './pages/AuthLoadingPage';
 import LoginPage from './pages/LoginPage';
@@ -16,7 +20,6 @@ import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
 import NewModulesPage from './pages/NewModulesPage';
 import NewModuleDetailPage from './pages/NewModuleDetailPage';
-import NewModuleQuizPage from './pages/NewModuleQuizPage';
 import GamePage from './pages/GamePage';
 import AIChatPage from './pages/AIChatPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -32,8 +35,10 @@ import MathMazePage from './pages/MathMazePage';
 import VocabVanguardPage from './pages/VocabVanguardPage';
 import LogicCircuitPage from './pages/LogicCircuitPage';
 import BadgePages from './pages/BadgePages';
-import ModulesPage from './pages/ModulesPage'; // Keep if you use this old module system
-import ModuleDetailPage from './pages/ModuleDetailPage'; // Keep if you use this old module system
+
+// If ModulesPage and ModuleDetailPage are missing imports, add them:
+// import ModulesPage from './pages/ModulesPage';
+// import ModuleDetailPage from './pages/ModuleDetailPage';
 
 const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }> = ({
   children,
@@ -126,9 +131,9 @@ const AppContent: React.FC = () => {
 
         <Route path="/badges" element={<PrivateRoute><BadgePages /></PrivateRoute>} />
 
-        {/* Existing Modules System (if still in use) */}
-        <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} />
-        <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} />
+        {/* Uncomment and import ModulesPage and ModuleDetailPage if you have them */}
+        {/* <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} /> */}
+        {/* <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} /> */}
 
         <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
         <Route path="/games" element={<PrivateRoute><GamesHubPage /></PrivateRoute>} />
@@ -172,8 +177,9 @@ const AppContent: React.FC = () => {
             </PrivateRoute>
           }
         />
-
-        {/* New Modules System (ensure these are the only definitions for these paths) */}
+ <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} />
+        <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} />
+        <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
         <Route
           path="/newmodules"
           element={
@@ -184,16 +190,17 @@ const AppContent: React.FC = () => {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/newmodule/:moduleId"
-          element={
-            <PrivateRoute>
-              <NewModuleDetailPage />
-            </PrivateRoute>
-          }
-        />
+
         <Route path="/newmodule/:moduleId/video/:videoIndex" element={<VideoPage />} />
         <Route path="/newmodule/:moduleId/quiz" element={<NewModuleQuizPage />} />
+<Route
+  path="/newmodule/:moduleId"
+  element={
+    <PrivateRoute>
+      <NewModuleDetailPage />
+    </PrivateRoute>
+  }
+/>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

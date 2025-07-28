@@ -11,25 +11,16 @@ interface QuizQuestion {
   correctAnswer: string;
 }
 
-interface ContentPiece {
-    _id?: string;
-    title?: string;
-    type: 'text' | 'video' | 'quiz';
-    data: any;
+interface ModuleContent {
+  _id?: string;
+  type: 'text' | 'video' | 'quiz';
+  data: any[];
 }
 
-interface Topic {
-    _id?: string;
-    title: string;
-    level: 'beginner' | 'intermediate' | 'advanced';
-    content: ContentPiece[];
-}
-
-interface LearningModule { // Renamed from Module to LearningModule for clarity
-    _id: string;
-    title: string;
-    content: ContentPiece[]; // This will be the combined content from topics for quiz page
-    topics: Topic[]; // Added topics to the type definition
+interface Module {
+  _id: string;
+  title: string;
+  content: ModuleContent[];
 }
 
 const NewModuleQuizPage: React.FC = () => {
@@ -37,7 +28,7 @@ const NewModuleQuizPage: React.FC = () => {
   const navigate = useNavigate();
   const { firebaseUser } = useAuth();
 
-  const [module, setModule] = useState<LearningModule | null>(null);
+  const [module, setModule] = useState<Module | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +41,6 @@ const NewModuleQuizPage: React.FC = () => {
   useEffect(() => {
     const fetchModule = async () => {
       try {
-        // CORRECTED: Fetch from /api/learning-modules
         const res = await apiClient.get(`/learning-modules/${moduleId}`);
         setModule(res.data);
       } catch (err) {
@@ -62,36 +52,24 @@ const NewModuleQuizPage: React.FC = () => {
     if (moduleId) fetchModule();
   }, [moduleId]);
 
-  const extractQuizQuestions = (mod: LearningModule): QuizQuestion[] => {
-    // Assuming quiz is always in the first topic's content for simplicity
-    const quizItem = mod.topics?.[0]?.content.find((item) => item.type === 'quiz');
-    if (!quizItem || !quizItem.data?.question) return []; // The quiz data structure is a single object directly with 'question', 'options', 'correctAnswer' from seedDB
+  const extractQuizQuestions = (mod: Module): QuizQuestion[] => {
+    const quizItem = mod.content.find((item) => item.type === 'quiz');
+    if (!quizItem || !quizItem.data?.[0]?.questions) return [];
 
-    // If quiz data has a 'questions' array (as per the earlier JSON you provided for "learning collection")
-    // Use this logic:
-    if (quizItem.data.questions && Array.isArray(quizItem.data.questions)) {
-        return quizItem.data.questions.map((q: any) => ({
-            question: q.question ?? '',
-            options: q.options ?? [],
-            correctAnswer:
-                typeof q.answer === 'number' && q.options && q.options.length > q.answer
-                    ? q.options[q.answer]
-                    : '',
-        }));
-    } else {
-        // If quiz data is a single question object (as per our seedDB structure)
-        return [{
-            question: quizItem.data.question ?? '',
-            options: quizItem.data.options ?? [],
-            correctAnswer: quizItem.data.correctAnswer ?? ''
-        }];
-    }
+    return quizItem.data[0].questions.map((q: any) => ({
+      question: q.question ?? '',
+      options: q.options ?? [],
+      correctAnswer:
+        typeof q.answer === 'number' && q.options && q.options.length > q.answer
+          ? q.options[q.answer]
+          : '',
+    }));
   };
 
-  const getQuizContentId = (mod: LearningModule): string => {
-    // Get the _id of the quiz content piece from the first topic
-    const quizItem = mod.topics?.[0]?.content.find((item) => item.type === 'quiz');
-    return quizItem?._id || `${mod._id}-quiz`;
+  const getQuizContentId = (mod: Module): string => {
+    const quizItem = mod.content.find((item) => item.type === 'quiz');
+    const contentId = quizItem?._id || quizItem?.data?.[0]?._id || `${mod._id}-quiz`;
+    return contentId;
   };
 
   const quizQuestions = module ? extractQuizQuestions(module) : [];
@@ -134,7 +112,7 @@ const NewModuleQuizPage: React.FC = () => {
         correctCount,
         total,
         selectedAnswers,
-        bandage
+        bandage // pass bandage boolean
       );
       setScore(correctCount);
       setSubmitted(true);
@@ -163,7 +141,7 @@ const NewModuleQuizPage: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
         <ExclamationCircleIcon className="h-20 w-20 text-red-500 mb-4" />
         <p className="text-red-600 text-center text-2xl font-semibold mb-4">
-          {error || 'Quiz not found or no questions available.'}
+          {error || 'Quiz not found.'}
         </p>
         <button
           onClick={() => navigate(-1)}

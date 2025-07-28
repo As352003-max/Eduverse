@@ -1,145 +1,148 @@
+// frontend/src/pages/NewModulesPage.tsx
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import apiClient from '../api/axiosClient';
 import { motion } from 'framer-motion';
 import { BookOpenIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
-import { useNavigate } from 'react-router-dom';
+
+interface Module {
+  _id: string;
+  title: string;
+  description: string;
+  gradeLevel: { min: number; max: number };
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+}
+
+const accentColors = [
+  'bg-indigo-500',
+  'bg-pink-500',
+  'bg-green-500',
+  'bg-yellow-500',
+  'bg-purple-500',
+  'bg-red-500',
+];
 
 const NewModulesPage: React.FC = () => {
-  const [modules, setModules] = useState<any[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchModules = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const res = await apiClient.get('/learning-modules');
-        setModules(res.data);
+        const response = await apiClient.get<Module[]>('/learning-modules');
+        setModules(response.data);
       } catch (err: any) {
         console.error('Error fetching modules:', err.response?.data || err.message);
-        setError('Failed to load modules. Please try again.');
+        setError(
+          'Failed to load modules. ' + (err.response?.data?.message || 'Please check your backend server.')
+        );
       } finally {
         setLoading(false);
       }
     };
-
     fetchModules();
   }, []);
 
-  const handleModuleClick = (moduleId: string) => {
-    if (moduleId) {
-      navigate(`/newmodule/${moduleId}`);
-    } else {
-      console.error("Attempted to navigate to a module with an invalid ID.");
-      setError("Cannot open module: Invalid ID provided.");
-    }
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <ArrowPathIcon className="h-20 w-20 text-indigo-600 animate-spin" />
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-4 text-xl font-semibold text-indigo-700"
-        >
-          Loading Modules...
-        </motion.p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <ArrowPathIcon className="h-16 w-16 text-indigo-600 animate-spin" />
+        <p className="ml-4 text-xl text-gray-700 font-semibold">Loading Modules...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6">
-        <ExclamationCircleIcon className="h-24 w-24 text-red-500 mb-6" />
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center text-3xl font-semibold text-red-600 mb-6"
-        >
-          {error}
-        </motion.p>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+        <ExclamationCircleIcon className="h-20 w-20 text-red-500 mb-4" />
+        <p className="text-red-600 text-center text-2xl font-semibold mb-4">{error}</p>
+        <button
           onClick={() => window.location.reload()}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300"
         >
           Retry
-        </motion.button>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 py-12 px-4">
-      <div className="container mx-auto max-w-6xl">
+    <div className="min-h-screen bg-gray-50 py-16">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <motion.h1
-          initial={{ opacity: 0, y: -50 }}
+          initial={{ opacity: 0, y: -60 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-6xl font-extrabold text-center text-indigo-800 mb-16 tracking-tight"
+          transition={{ duration: 0.6 }}
+          className="text-5xl font-extrabold text-gray-900 mb-16 text-center tracking-tight"
         >
-          <BookOpenIcon className="inline-block h-14 w-14 mr-4 text-purple-600" />
-          Learning Modules
+       Discover Interactive Learning Adventures
         </motion.h1>
 
         {modules.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center text-2xl text-gray-600 mt-20"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="bg-white rounded-3xl shadow-xl p-12 text-center flex flex-col items-center justify-center"
           >
-            No modules available yet.
+            <BookOpenIcon className="h-28 w-28 text-gray-300 mb-8" />
+            <p className="text-2xl text-gray-700 font-semibold mb-3">No learning modules available yet.</p>
+            <p className="text-lg text-gray-500 max-w-md">
+              Please check back later or contact support if you think this is an error.
+            </p>
           </motion.div>
         ) : (
           <motion.div
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            variants={{
-              visible: {
-                transition: {
-                  staggerChildren: 0.1,
-                },
-              },
-            }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"
           >
-            {modules.map((module) => (
+            {modules.map((module, idx) => (
               <motion.div
                 key={module._id}
-                variants={{
-                  hidden: { opacity: 0, scale: 0.9 },
-                  visible: { opacity: 1, scale: 1 },
+                variants={itemVariants}
+                whileHover={{
+                  y: -8,
+                  boxShadow:
+                    '0 20px 25px -5px rgba(99, 102, 241, 0.3), 0 10px 10px -5px rgba(99, 102, 241, 0.2)',
                 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 15px 30px rgba(0,0,0,0.15)" }}
-                transition={{ type: "spring", stiffness: 300 }}
-                className="bg-white rounded-3xl shadow-xl overflow-hidden cursor-pointer flex flex-col"
-                onClick={() => handleModuleClick(module._id)}
+                className="bg-white rounded-3xl shadow-lg p-8 flex flex-col h-full border border-gray-100 transform transition duration-300 ease-in-out cursor-pointer"
               >
-                <div className="p-8 flex flex-col justify-between flex-grow">
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                {/* Colored accent bar on top */}
+                <div className={`h-1 w-14 rounded-full mb-4 ${accentColors[idx % accentColors.length]}`}></div>
+
+                <Link
+                  to={`/newmodule/${module._id}`}
+                  className="block h-full focus:outline-none focus:ring-4 focus:ring-indigo-400 rounded"
+                >
+                  <h2 className="text-3xl font-semibold text-indigo-700 mb-4 leading-snug">
                     {module.title}
                   </h2>
-                  <p className="text-gray-600 text-lg mb-6 flex-grow">
+                  <p className="text-gray-700 flex-grow mb-6 leading-relaxed line-clamp-4">
                     {module.description}
                   </p>
-                  {module.gradeLevel && (
-                    <div className="text-sm text-gray-500 mb-4">
-                      <p>Grade: {module.gradeLevel.min}-{module.gradeLevel.max}</p>
-                      {module.topics && module.topics.length > 0 && (
-                        <p>Difficulty: {module.topics[0]?.level}</p>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1">
-                      Start Learning
-                    </button>
+                  <div className="mt-auto text-indigo-600 font-medium text-sm uppercase tracking-wide select-none">
+                    View Details →
                   </div>
-                </div>
+                </Link>
               </motion.div>
             ))}
           </motion.div>

@@ -1,59 +1,69 @@
-const asyncHandler = require('express-async-handler');
-const { getUserDoc } = require('../utils/firestoreHelpers');
-const admin = require('firebase-admin');
+const { db } = require('../utils/firebase'); // Firestore instance
 
-exports.markTextAsRead = asyncHandler(async (req, res) => {
-    const { moduleId, contentId } = req.body;
-    const userId = req.user?.uid;
+const getToday = () => new Date().toISOString().split('T')[0];
+const getCurrentTime = () => new Date().toTimeString().split(' ')[0];
 
-    if (!userId) {
-        console.error("markTextAsRead: User ID missing from authenticated request.");
-        return res.status(401).json({ message: "Not authorized: User ID missing or invalid." });
+async function markTextAsRead(userId, moduleId, contentId) {
+  if (!userId || !moduleId || !contentId) throw new Error("Missing required fields");
+  try {
+    const today = getToday();
+    const fieldPath = `textProgress.${moduleId}.${contentId}.${today}`;
+    await db.collection('progress').doc(userId).set({ [fieldPath]: true }, { merge: true });
+    console.log(`✅ Text marked as read: ${fieldPath}`);
+  } catch (error) {
+    console.error("🔥 markTextAsRead ERROR:", error);
+    throw new Error("Failed to mark text as read");
+  }
+}
+
+async function updateVideoProgress(userId, moduleId, contentId, watchTime) {
+  if (!userId || !moduleId || !contentId || watchTime == null) throw new Error("Missing required fields");
+  try {
+    const today = getToday();
+    const currentTime = getCurrentTime();
+    const fieldPath = `videoProgress.${moduleId}.${contentId}.${today}.${currentTime}`;
+    await db.collection('progress').doc(userId).set({ [fieldPath]: watchTime }, { merge: true });
+    console.log(`✅ Video watch time saved: ${fieldPath}`);
+  } catch (error) {
+    console.error("🔥 updateVideoProgress ERROR:", error);
+    throw new Error("Failed to update video progress");
+  }
+}
+
+async function saveQuizResult(userId, moduleId, contentId, correctAnswers, answers) {
+  if (!userId || !moduleId || !contentId || correctAnswers == null || !Array.isArray(answers)) {
+    throw new Error("Missing or invalid required fields");
+  }
+  try {
+    const today = getToday();
+    const currentTime = getCurrentTime();
+    const timestampId = `${today}_${currentTime}`;
+    const fieldPath = `quizProgress.${moduleId}.${contentId}.${timestampId}`;
+
+    const data = {
+      correctAnswers,
+      totalQuestions: answers.length,
+      answers,
+      submittedAt: new Date().toISOString(),
+    };
+
+    const progressRef = db.collection('progress').doc(userId);
+    const batch = db.batch();
+    batch.set(progressRef, { [fieldPath]: data }, { merge: true });
+
+    if (correctAnswers === answers.length) {
+      const doc = await progressRef.get();
+      const currentBandages = doc.exists && doc.data().bandages ? doc.data().bandages : 0;
+      batch.set(progressRef, { bandages: currentBandages + 1 }, { merge: true });
+      console.log("🎉 Bandage awarded in Firestore progress!");
     }
 
-    try {
-        const userDocRef = getUserDoc(userId);
-        await userDocRef.update({
-            [`progress.${moduleId}.readContent.${contentId}`]: true,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+    await batch.commit();
+    console.log(`✅ Quiz progress saved: ${fieldPath}`);
+  } catch (error) {
+    console.error("🔥 saveQuizResult ERROR:", error);
+    throw new Error("Failed to save quiz result");
+  }
+}
 
-        res.status(200).json({ message: 'Text marked as read successfully' });
-    } catch (error) {
-        console.error('🔥 markTextAsRead ERROR:', error);
-        if (error.message.includes("Invalid userId")) {
-            return res.status(400).json({ message: error.message });
-        }
-        res.status(500).json({ message: "Failed to mark text as read", details: error.message });
-    }
-});
-
-exports.updateVideoWatchTime = asyncHandler(async (req, res) => {
-    const { moduleId, contentId, secondsWatched } = req.body;
-    const userId = req.user?.uid;
-
-    if (!userId) {
-        console.error("updateVideoWatchTime: User ID missing from authenticated request.");
-        return res.status(401).json({ message: "Not authorized: User ID missing or invalid." });
-    }
-
-    if (typeof secondsWatched !== 'number' || secondsWatched < 0) {
-        return res.status(400).json({ message: "Invalid secondsWatched value." });
-    }
-
-    try {
-        const userDocRef = getUserDoc(userId);
-        await userDocRef.update({
-            [`progress.${moduleId}.videoWatchTime.${contentId}`]: admin.firestore.FieldValue.increment(secondsWatched),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-
-        res.status(200).json({ message: 'Video watch time updated successfully' });
-    } catch (error) {
-        console.error('🔥 updateVideoWatchTime ERROR:', error);
-        if (error.message.includes("Invalid userId")) {
-            return res.status(400).json({ message: error.message });
-        }
-        res.status(500).json({ message: "Failed to update video watch time", details: error.message });
-    }
-});
+module.exports = { markTextAsRead, updateVideoProgress, saveQuizResult };

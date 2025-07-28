@@ -6,8 +6,7 @@ let serviceAccount;
 try {
   serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
 } catch (e) {
-  console.error("Error parsing FIREBASE_CONFIG. Please ensure it is a valid stringified JSON for your Firebase service account key.");
-  console.error("The error was:", e.message);
+  console.error("Invalid FIREBASE_CONFIG JSON:", e.message);
   process.exit(1);
 }
 

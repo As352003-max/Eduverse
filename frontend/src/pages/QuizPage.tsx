@@ -1,6 +1,7 @@
-// src/pages/QuizPage.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import apiClient from "../api/axiosClient"; // ✅ Use your axios instance
+import { useAuth } from "../context/AuthContext"; // ✅ To get logged-in user
 
 const quizData = [
   { question: "What is the capital of France?", options: ["Paris", "Rome", "Berlin", "Madrid"], answer: "Paris" },
@@ -16,9 +17,12 @@ const quizData = [
 ];
 
 const QuizPage: React.FC = () => {
+  const { firebaseUser } = useAuth(); // ✅ Get logged-in user's UID
   const [answers, setAnswers] = useState<string[]>(Array(quizData.length).fill(""));
   const [score, setScore] = useState<number | null>(null);
   const [error, setError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const navigate = useNavigate();
 
   const handleAnswerChange = (index: number, value: string) => {
@@ -27,21 +31,42 @@ const QuizPage: React.FC = () => {
     setAnswers(newAnswers);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (answers.includes("")) {
       setError(true);
       return;
     }
     setError(false);
-    const calculatedScore = quizData.reduce((acc, curr, i) => {
-      return acc + (answers[i] === curr.answer ? 1 : 0);
-    }, 0);
+
+    // ✅ Calculate score
+    const correctAnswers = quizData.reduce((acc, curr, i) => acc + (answers[i] === curr.answer ? 1 : 0), 0);
+    const totalQuestions = quizData.length;
+    const calculatedScore = correctAnswers;
     setScore(calculatedScore);
+
+    // ✅ Send to backend if user is logged in
+    if (firebaseUser?.uid) {
+      setSaving(true);
+      try {
+        const timestamp = new Date().toISOString().split("T")[0]; // e.g., "2025-07-28"
+        const timestampId = `${timestamp}_${Date.now()}`; // Unique key
+
+        await apiClient.post(`/newanalytics/saveQuiz/${firebaseUser.uid}`, {
+          timestampId,
+          correctAnswers,
+          totalQuestions,
+        });
+
+        setSaved(true);
+      } catch (err) {
+        console.error("❌ Failed to save quiz results:", err);
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
-  const handleClose = () => {
-    navigate("/");
-  };
+  const handleClose = () => navigate("/");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-indigo-100 p-6">
@@ -80,20 +105,19 @@ const QuizPage: React.FC = () => {
 
         <button
           onClick={handleSubmit}
-          className="mt-6 px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+          disabled={saving}
+          className={`mt-6 px-6 py-2 rounded transition ${saving ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700 text-white"}`}
         >
-          Submit Quiz
+          {saving ? "Saving..." : "Submit Quiz"}
         </button>
 
-        {error && (
-          <p className="text-red-600 font-semibold mt-4">⚠️ Please answer all questions before submitting.</p>
-        )}
+        {error && <p className="text-red-600 font-semibold mt-4">⚠️ Please answer all questions before submitting.</p>}
 
         {score !== null && !error && (
-          <p className="mt-4 font-bold text-green-600 text-lg">
-            ✅ Your Score: {score} / {quizData.length}
-          </p>
+          <p className="mt-4 font-bold text-green-600 text-lg">✅ Your Score: {score} / {quizData.length}</p>
         )}
+
+        {saved && <p className="mt-2 text-blue-600 font-medium">📡 Quiz result saved! Check your dashboard.</p>}
       </div>
     </div>
   );
