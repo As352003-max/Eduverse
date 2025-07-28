@@ -1,22 +1,24 @@
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 
 let serviceAccount;
 
-if (process.env.NODE_ENV === 'production') {
-  try {
+try {
+  if (process.env.FIREBASE_CONFIG) {
     serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
-  } catch (err) {
-    console.error('❌ Failed to parse FIREBASE_CONFIG environment variable', err);
-    process.exit(1);
+    console.log("✅ Firebase credentials loaded from ENV");
+  } else {
+    serviceAccount = require("../config/serviceAccountKey.json");
+    console.log("✅ Firebase credentials loaded from local file");
   }
-} else {
-  serviceAccount = require('../config/serviceAccountKey.json');
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
+} catch (err) {
+  console.error("❌ Firebase initialization failed:", err.message);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
 const db = admin.firestore();
-
 module.exports = { admin, db };
