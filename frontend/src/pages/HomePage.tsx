@@ -1,10 +1,7 @@
-// HomePage.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import gsap from "gsap";
-import Particles from "react-tsparticles";
-import { loadSlim } from "tsparticles-slim";
 
 const quotes = [
   "“Education is the passport to the future...” – Malcolm X",
@@ -13,151 +10,184 @@ const quotes = [
   "“The beautiful thing about learning is that no one can take it away from you.” – B.B. King",
 ];
 
+const bgImages = [
+  "https://tse4.mm.bing.net/th/id/OIP.bImISDVuXSGLYudJsLuZ5QHaCz?pid=Api&P=0&h=180",
+  "https://images.unsplash.com/photo-1535909339361-9b3cfb48d6ee?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1600&q=80",
+];
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
-  const headingRef = useRef<HTMLHeadingElement | null>(null);
-  const cursorRef = useRef<HTMLSpanElement | null>(null);
-  const cardRef = useRef<HTMLDivElement | null>(null);
-  const quoteRef = useRef<HTMLDivElement | null>(null);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
-  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+
   const fullText = `Welcome, ${user?.username || "Learner"}`;
 
   const navCards = [
-    { title: "Start Learning", description: "AI-powered modules to boost your knowledge.", icon: "📚", link: "/modules", bgColor: "from-blue-500 to-indigo-700" },
-    { title: "Play & Earn XP", description: "Gamified learning with rewards.", icon: "🎮", link: "/games", bgColor: "from-green-500 to-emerald-700" },
-    { title: "Take a Quiz", description: "Test yourself & track progress easily.", icon: "📝", link: "/quiz", bgColor: "from-pink-500 to-rose-700" },
-    { title: "Ask the AI", description: "Instant answers & explanations.", icon: "🤖", link: "/ai-chat", bgColor: "from-purple-500 to-indigo-800" },
-    { title: "Build Projects", description: "Collaborate & create amazing projects.", icon: "💡", link: "/projects", bgColor: "from-yellow-400 to-orange-700" },
-    { title: "Leaderboard", description: "See where you stand among learners.", icon: "🏆", link: "/leaderboard", bgColor: "from-red-500 to-rose-800" },
-    { title: "Your Profile", description: "Manage your data & achievements.", icon: "👤", link: "/profile", bgColor: "from-indigo-400 to-violet-800" },
+    { title: "Start Learning", description: "Explore AI-powered lessons with interactive exercises.", icon: "📚", link: "/modules", bgColor: "from-blue-600 to-indigo-800" },
+    { title: "Play & Earn XP", description: "Gamified learning with rewards and badges.", icon: "🎮", link: "/games", bgColor: "from-green-500 to-emerald-800" },
+    { title: "Take a Quiz", description: "Challenge yourself with quizzes to test your knowledge.", icon: "📝", link: "/quiz", bgColor: "from-pink-500 to-rose-800" },
+    { title: "Ask the AI", description: "Get instant answers and smart explanations from our AI tutor.", icon: "🤖", link: "/ai-chat", bgColor: "from-purple-500 to-violet-800" },
+    { title: "Build Projects", description: "Work on real-world projects and enhance your skills.", icon: "💡", link: "/projects", bgColor: "from-yellow-400 to-orange-700" },
+    { title: "Leaderboard", description: "Track rankings and compete with other learners.", icon: "🏆", link: "/leaderboard", bgColor: "from-red-500 to-rose-800" },
+    { title: "Your Profile", description: "Manage achievements, progress, and settings easily.", icon: "👤", link: "/profile", bgColor: "from-indigo-400 to-blue-800" },
   ];
 
-  const particlesInit = async (engine: any) => {
-    await loadSlim(engine);
-  };
-
-  // ✅ Play Sound Helper
-  const playSound = (url: string, volume: number = 0.3) => {
-    const audio = new Audio(url);
-    audio.volume = volume;
-    audio.play();
-  };
-
-  // ✅ Typewriter effect with typing sound
+  // ✅ Typewriter Effect
   useEffect(() => {
     let i = 0;
-    let forward = true;
     const interval = setInterval(() => {
       setTypedText(fullText.slice(0, i));
-      playSound("/sounds/type.mp3", 0.1); // 🔊 typing sound
-      if (forward) i++;
-      else i--;
-      if (i === fullText.length) forward = false;
-      if (i === 0) forward = true;
-    }, 150);
+      i++;
+      if (i > fullText.length) clearInterval(interval);
+    }, 100);
     return () => clearInterval(interval);
   }, [fullText]);
 
-  useEffect(() => {
-    if (cursorRef.current) gsap.to(cursorRef.current, { opacity: 0, repeat: -1, yoyo: true, duration: 0.6 });
-  }, []);
-
-  // ✅ Card & Quotes Animation + Sound
+  // ✅ Quotes + Background Change
   useEffect(() => {
     const timer = setInterval(() => {
-      playSound("/sounds/flip.mp3", 0.2); // 🔊 flip sound
-      setCurrentCardIndex((i) => (i + 1) % navCards.length);
-    }, 5000);
+      setCurrentQuoteIndex((i) => (i + 1) % quotes.length);
+      setCurrentBgIndex((i) => (i + 1) % bgImages.length);
+    }, 6000);
     return () => clearInterval(timer);
   }, []);
 
+  // ✅ Cards Auto Rotate
   useEffect(() => {
-    const quoteTimer = setInterval(() => setCurrentQuoteIndex((i) => (i + 1) % quotes.length), 6000);
-    return () => clearInterval(quoteTimer);
+    const cardTimer = setInterval(() => setCurrentCardIndex((i) => (i + 1) % navCards.length), 4000);
+    return () => clearInterval(cardTimer);
   }, []);
 
-  useEffect(() => {
-    if (cardRef.current) gsap.fromTo(cardRef.current, { opacity: 0, y: 20, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 1.2, ease: "power3.out" });
-    if (quoteRef.current) gsap.fromTo(quoteRef.current, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 1, ease: "power2.out" });
-  }, [currentCardIndex, currentQuoteIndex]);
-
-  // ✅ AI Voice Greeting on Load
+  // ✅ Voiceover Greeting
   useEffect(() => {
     const synth = window.speechSynthesis;
-    const utter = new SpeechSynthesisUtterance(`Hello ${user?.username || "Learner"}, welcome to Eduverse! Let's start learning.`);
-    utter.pitch = 1.2;
-    utter.rate = 0.9;
-    utter.volume = 1;
+    const utter = new SpeechSynthesisUtterance(
+      `Hello ${user?.username || "Learner"}, welcome to Eduverse! Explore interactive modules, play games, take quizzes, and learn smarter.`
+    );
+    utter.pitch = 1;
+    utter.rate = 1;
     synth.speak(utter);
   }, []);
 
-  // ✅ Floating AI Avatar animation
+  // ✅ Parallax Effect
   useEffect(() => {
-    gsap.to(".ai-avatar", { y: -10, repeat: -1, yoyo: true, ease: "power1.inOut", duration: 2 });
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 20;
+      const y = (e.clientY / window.innerHeight - 0.5) * 20;
+      setParallax({ x, y });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-black via-gray-900 to-purple-900 overflow-hidden text-white">
-      {/* Morphing Blobs */}
-      <div className="absolute w-72 h-72 bg-pink-500/30 rounded-full blur-3xl animate-pulse top-20 left-10"></div>
-      <div className="absolute w-96 h-96 bg-blue-400/20 rounded-full blur-3xl animate-bounce top-40 right-10"></div>
+    <div className="relative min-h-screen text-white overflow-hidden">
+      {/* ✅ Background Images with Crossfade + Parallax */}
+      {bgImages.map((img, index) => (
+        <motion.div
+          key={index}
+          className="absolute inset-0 bg-cover bg-center transition-opacity duration-[2000ms]"
+          style={{
+            backgroundImage: `url(${img})`,
+            opacity: currentBgIndex === index ? 1 : 0,
+            transform: `translate(${parallax.x}px, ${parallax.y}px) scale(1.05)`,
+          }}
+        />
+      ))}
 
-      {/* Particles */}
-      <Particles id="tsparticles" init={particlesInit} options={{
-        background: { color: { value: "transparent" } },
-        particles: { number: { value: 40 }, move: { enable: true, speed: 1 }, color: { value: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] }, links: { enable: true, color: "#aaa", opacity: 0.3 } }
-      }} className="absolute top-0 left-0 w-full h-full z-0" />
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-purple-900/70"></div>
 
-      {/* Heading */}
-      <div className="relative z-10 text-center py-16">
-        <h1 className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-pink-400 via-purple-300 to-blue-300 bg-clip-text text-transparent">
-          {typedText}<span ref={cursorRef}>|</span>
-        </h1>
-        <p className="text-gray-300 text-lg">Your AI-powered learning platform for kids, parents & teachers</p>
-      </div>
+      <div className="relative z-10">
+        {/* Heading */}
+        <div className="text-center py-16">
+          <h1 className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-pink-400 via-purple-300 to-blue-300 bg-clip-text text-transparent">
+            {typedText}
+          </h1>
+          <p className="text-gray-300 text-lg mt-2">Your AI-powered learning platform for kids, parents & teachers</p>
+        </div>
 
-      {/* Sliding Quotes */}
-      <div ref={quoteRef} className="relative z-10 text-center italic text-xl text-gray-200 max-w-3xl mx-auto mb-10">
-        {quotes[currentQuoteIndex]}
-      </div>
+        {/* Quotes with Animation */}
+        <div className="text-center italic text-xl text-gray-200 max-w-3xl mx-auto mb-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentQuoteIndex}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.8 }}
+            >
+              {quotes[currentQuoteIndex]}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
-      {/* Rotating Card */}
-      <div className="flex justify-center">
-        <Link to={navCards[currentCardIndex].link} ref={cardRef}
-          className={`p-8 w-full max-w-md rounded-3xl shadow-2xl backdrop-blur-lg bg-gradient-to-br ${navCards[currentCardIndex].bgColor} border border-white/20 transform transition hover:scale-105 hover:rotate-1`}>
-          <div className="text-6xl mb-3">{navCards[currentCardIndex].icon}</div>
-          <h2 className="text-3xl font-bold mb-2">{navCards[currentCardIndex].title}</h2>
-          <p>{navCards[currentCardIndex].description}</p>
+        {/* Rotating Card with Animation */}
+        <div className="flex justify-center mb-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentCardIndex}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.7 }}
+              className={`p-8 w-full max-w-md rounded-3xl shadow-2xl backdrop-blur-lg bg-gradient-to-br ${navCards[currentCardIndex].bgColor} border border-white/30`}
+            >
+              <Link to={navCards[currentCardIndex].link}>
+                <div className="text-6xl mb-3">{navCards[currentCardIndex].icon}</div>
+                <h2 className="text-3xl font-bold mb-2">{navCards[currentCardIndex].title}</h2>
+                <p>{navCards[currentCardIndex].description}</p>
+              </Link>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Features Section (unchanged) */}
+        <div className="grid md:grid-cols-3 gap-6 px-6 mb-20">
+          {/* Children */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-pink-500/40 to-purple-700/50 backdrop-blur-md border border-white/20 shadow-lg">
+            <h3 className="text-2xl font-bold mb-2">👦 For Children</h3>
+            <ul className="list-disc ml-5 text-gray-200 space-y-1">
+              <li>Interactive AI lessons with XP rewards</li>
+              <li>Gamified quizzes and fun challenges</li>
+              <li>Progress badges and achievements</li>
+            </ul>
+          </div>
+          {/* Parents */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-green-400/40 to-emerald-700/50 backdrop-blur-md border border-white/20 shadow-lg">
+            <h3 className="text-2xl font-bold mb-2">👩‍👩‍👦 For Parents</h3>
+            <ul className="list-disc ml-5 text-gray-200 space-y-1">
+              <li>Real-time progress tracking</li>
+              <li>Detailed analytics & performance reports</li>
+              <li>Motivation tools for better learning</li>
+            </ul>
+          </div>
+          {/* Teachers */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-400/40 to-indigo-700/50 backdrop-blur-md border border-white/20 shadow-lg">
+            <h3 className="text-2xl font-bold mb-2">👨‍🏫 For Teachers</h3>
+            <ul className="list-disc ml-5 text-gray-200 space-y-1">
+              <li>AI-powered content creation tools</li>
+              <li>Student analytics dashboard</li>
+              <li>Collaborative teaching environment</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Floating AI Bot */}
+        <Link to="/ai-chat" className="fixed bottom-8 left-6 w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-indigo-700 shadow-lg flex items-center justify-center text-3xl hover:scale-110 transition">
+          🤖
+        </Link>
+
+        {/* Quiz Button */}
+        <Link to="/quiz" className="fixed bottom-6 right-6 bg-gradient-to-r from-pink-500 to-rose-700 text-white px-5 py-3 rounded-full shadow-lg hover:scale-105 transition">
+          📝 Take Quiz
         </Link>
       </div>
-
-      {/* Benefits Section */}
-      <div className="grid md:grid-cols-3 gap-6 mt-16 px-6">
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-pink-500/30 to-purple-600/30 backdrop-blur-md border border-white/20 shadow-lg">
-          <h3 className="text-2xl font-bold mb-2">👦 For Children</h3>
-          <p>Fun games, quizzes, and interactive AI lessons with XP rewards.</p>
-        </div>
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-green-400/30 to-emerald-700/30 backdrop-blur-md border border-white/20 shadow-lg">
-          <h3 className="text-2xl font-bold mb-2">👩‍👩‍👦 For Parents</h3>
-          <p>Track your child’s progress and motivate them with achievements.</p>
-        </div>
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-400/30 to-indigo-700/30 backdrop-blur-md border border-white/20 shadow-lg">
-          <h3 className="text-2xl font-bold mb-2">👨‍🏫 For Teachers</h3>
-          <p>Create engaging content, assign tasks & monitor student analytics.</p>
-        </div>
-      </div>
-
-      {/* Floating AI Avatar */}
-      <div className="ai-avatar fixed bottom-8 left-6 w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 shadow-lg flex items-center justify-center text-3xl">
-        🤖
-      </div>
-
-      {/* Floating Quiz Button */}
-      <Link to="/quiz" className="fixed bottom-6 right-6 z-20 bg-pink-600 text-white px-5 py-3 rounded-full shadow-lg hover:bg-pink-700 transition-all">
-        📝 Take Quiz
-      </Link>
     </div>
   );
 };

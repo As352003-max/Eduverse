@@ -248,3 +248,16 @@ Eduverse/
 ## 10. License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+
+---
+
+## 11. Recent Updates
+
+- **Enhanced AI Chatbot:** Improved context retention and response accuracy using the latest Gemini API updates.
+- **Project Collaboration:** Added real-time project editing and commenting with Socket.IO.
+- **Progress Analytics:** New dashboard for users to visualize learning stats and achievements.
+- **Role Management:** Admins can now assign and update user roles from the dashboard.
+- **UI Improvements:** Refined navigation, added dark mode, and improved accessibility.
+- **Bug Fixes:** Addressed issues with authentication edge cases and module progress tracking.
+
+--- 
