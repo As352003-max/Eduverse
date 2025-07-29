@@ -32,33 +32,52 @@ require('./config/firebaseAdmin');
 
 app.use(express.json());
 
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-    .split(',')
-    .map(o => o.trim());
+// ✅ Allowed origins (both local & deployed frontend)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://eduverse-ebon.vercel.app'
+];
 
-app.use(cors({
-    origin: (origin, cb) => {
-        if (!origin || allowedOrigins.includes(origin)) cb(null, true);
-        else cb(new Error('CORS Not Allowed'));
-    },
-    credentials: true
-}));
-
+// ✅ Global CORS fix (handles preflight OPTIONS as well)
 app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () =>
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} - ${Date.now() - start}ms`)
-    );
-    next();
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
 });
 
+// ✅ Keep cors() middleware for extra safety
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+// ✅ Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () =>
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} - ${Date.now() - start}ms`)
+  );
+  next();
+});
+
+// ✅ Rate limiting
 app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }));
 
+// ✅ Database connection
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ MongoDB Connected'))
-    .catch(err => console.error('❌ MongoDB Error:', err));
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.error('❌ MongoDB Error:', err));
 
+// ✅ API routes
 app.use('/api/users', usersRoutes);
 app.use('/api/learning-modules', learningModuleRoutes);
 app.use('/api/progress', progressRoutes);
@@ -76,30 +95,34 @@ app.use('/api/game/vocabvanguard', vocabVanguardRoutes);
 app.use('/api/game/logiccircuit', logicCircuitRoutes);
 app.use('/api/newanalytics', newAnalyticsRoutes);
 
+// ✅ Classification endpoint
 app.post('/api/classify', async (req, res) => {
-    const { hint, options } = req.body;
-    if (!hint || !Array.isArray(options)) return res.status(400).json({ error: 'Hint and options required.' });
+  const { hint, options } = req.body;
+  if (!hint || !Array.isArray(options)) return res.status(400).json({ error: 'Hint and options required.' });
 
-    const normalizedHint = hint.trim().toLowerCase();
-    const normalizedOptions = options.map(opt => opt.toLowerCase());
+  const normalizedHint = hint.trim().toLowerCase();
+  const normalizedOptions = options.map(opt => opt.toLowerCase());
 
-    if (normalizedOptions.includes(normalizedHint)) return res.json({ guess: normalizedHint });
+  if (normalizedOptions.includes(normalizedHint)) return res.json({ guess: normalizedHint });
 
-    try {
-        const hfRes = await axios.post(
-            'https://api-inference.huggingface.co/models/facebook/bart-large-mnli',
-            { inputs: hint, parameters: { candidate_labels: options, multi_label: false } },
-            { headers: { Authorization: `Bearer ${process.env.HF_API_TOKEN}` } }
-        );
-        res.json({ guess: hfRes.data?.labels?.[0] || 'unknown' });
-    } catch {
-        res.status(500).json({ error: 'Classification failed.' });
-    }
+  try {
+    const hfRes = await axios.post(
+      'https://api-inference.huggingface.co/models/facebook/bart-large-mnli',
+      { inputs: hint, parameters: { candidate_labels: options, multi_label: false } },
+      { headers: { Authorization: `Bearer ${process.env.HF_API_TOKEN}` } }
+    );
+    res.json({ guess: hfRes.data?.labels?.[0] || 'unknown' });
+  } catch {
+    res.status(500).json({ error: 'Classification failed.' });
+  }
 });
 
+// ✅ Root route
 app.get('/', (req, res) => res.send('🌐 Eduverse Backend API is running!'));
 
+// ✅ Socket.IO initialization
 initSocket(server, allowedOrigins);
 
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
