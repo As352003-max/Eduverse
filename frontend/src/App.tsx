@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+
 import LevelMenu from './components/LevelMenu';
 import { useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -10,6 +11,7 @@ import ErrorBoundary from './pages/ErrorBoundary';
 import ModulesPage from './pages/ModulesPage';
 import ModuleDetailPage from './pages/ModuleDetailPage';
 import NewModuleQuizPage from './pages/NewModuleQuizPage';
+ // <-- fixed import path
 import VideoPage from './pages/VideoPage';
 import AuthLoadingPage from './pages/AuthLoadingPage';
 import LoginPage from './pages/LoginPage';
@@ -33,17 +35,23 @@ import MathMazePage from './pages/MathMazePage';
 import VocabVanguardPage from './pages/VocabVanguardPage';
 import LogicCircuitPage from './pages/LogicCircuitPage';
 import BadgePages from './pages/BadgePages';
-import QuizPage from './pages/QuizPage';
-// ✅ Import the new PrivateLayout
-import PrivateLayout from './components/PrivateLayout';
 
-const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+// If ModulesPage and ModuleDetailPage are missing imports, add them:
+// import ModulesPage from './pages/ModulesPage';
+// import ModuleDetailPage from './pages/ModuleDetailPage';
+
+const PrivateRoute: React.FC<{ children: JSX.Element; allowedRoles?: string[] }> = ({
+  children,
+  allowedRoles,
+}) => {
   const { user, loading } = useAuth();
+
   if (loading) return <AuthLoadingPage />;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
+
   return children;
 };
 
@@ -76,36 +84,124 @@ const AppContent: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* ✅ Wrap all Private pages inside PrivateLayout */}
-        <Route path="/dashboard" element={<PrivateRoute><PrivateLayout><DashboardPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/profile" element={<PrivateRoute><PrivateLayout><UserProfilePage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/dashboard/students" element={<PrivateRoute><PrivateLayout><TeacherDashboardPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/dashboard/students/:studentId" element={<PrivateRoute><PrivateLayout><StudentProgressDetailPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/children" element={<PrivateRoute><PrivateLayout><MyChildrenPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/children/:childId/dashboard" element={<PrivateRoute><PrivateLayout><StudentProgressDetailPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/badges" element={<PrivateRoute><PrivateLayout><BadgePages /></PrivateLayout></PrivateRoute>} />
-        <Route path="/modules" element={<PrivateRoute><PrivateLayout><ModulesPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/modules/:moduleId" element={<PrivateRoute><PrivateLayout><ModuleDetailPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><PrivateLayout><GamePage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/games" element={<PrivateRoute><PrivateLayout><GamesHubPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/game/mathmaze/:moduleId" element={<PrivateRoute><PrivateLayout><MathMazePage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/game/vocabvanguard/:moduleId" element={<PrivateRoute><PrivateLayout><VocabVanguardPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/game/logiccircuit/:moduleId" element={<PrivateRoute><PrivateLayout><LogicCircuitPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/shadow-game/:levelId" element={<PrivateRoute><PrivateLayout><LevelMenu totalLevels={5} /></PrivateLayout></PrivateRoute>} />
-        <Route path="/ai-chat" element={<PrivateRoute><PrivateLayout><AIChatPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/projects" element={<PrivateRoute><PrivateLayout><ProjectsPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/projects/create" element={<PrivateRoute><PrivateLayout><CreateEditProjectPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/projects/edit/:projectId" element={<PrivateRoute><PrivateLayout><CreateEditProjectPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/projects/:projectId" element={<PrivateRoute><PrivateLayout><ProjectDetailPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/leaderboard" element={<PrivateRoute><PrivateLayout><LeaderboardPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/admin" element={<PrivateRoute><PrivateLayout><div>Admin Dashboard Content</div></PrivateLayout></PrivateRoute>} />
-        <Route path="/newmodules" element={<PrivateRoute><PrivateLayout><ErrorBoundary><NewModulesPage /></ErrorBoundary></PrivateLayout></PrivateRoute>} />
-        <Route path="/newmodule/:moduleId/video/:videoIndex" element={<PrivateLayout><VideoPage /></PrivateLayout>} />
-        <Route path="/newmodule/:moduleId/quiz" element={<PrivateLayout><NewModuleQuizPage /></PrivateLayout>} />
-        <Route path="/newmodule/:moduleId" element={<PrivateRoute><PrivateLayout><NewModuleDetailPage /></PrivateLayout></PrivateRoute>} />
-        <Route path="/quiz" element={<PrivateRoute><PrivateLayout><QuizPage /></PrivateLayout></PrivateRoute>} />
-        
-        
+        <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute allowedRoles={['student', 'teacher', 'parent', 'admin']}>
+              <UserProfilePage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/students"
+          element={
+            <PrivateRoute allowedRoles={['teacher', 'admin']}>
+              <TeacherDashboardPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/students/:studentId"
+          element={
+            <PrivateRoute allowedRoles={['teacher', 'parent', 'admin']}>
+              <StudentProgressDetailPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/children"
+          element={
+            <PrivateRoute allowedRoles={['parent', 'admin']}>
+              <MyChildrenPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/children/:childId/dashboard"
+          element={
+            <PrivateRoute allowedRoles={['parent', 'admin']}>
+              <StudentProgressDetailPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route path="/badges" element={<PrivateRoute><BadgePages /></PrivateRoute>} />
+
+        {/* Uncomment and import ModulesPage and ModuleDetailPage if you have them */}
+        {/* <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} /> */}
+        {/* <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} /> */}
+
+        <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
+        <Route path="/games" element={<PrivateRoute><GamesHubPage /></PrivateRoute>} />
+
+        <Route path="/game/mathmaze/:moduleId" element={<PrivateRoute><MathMazePage /></PrivateRoute>} />
+        <Route path="/game/vocabvanguard/:moduleId" element={<PrivateRoute><VocabVanguardPage /></PrivateRoute>} />
+        <Route path="/game/logiccircuit/:moduleId" element={<PrivateRoute><LogicCircuitPage /></PrivateRoute>} />
+
+        <Route
+          path="/shadow-game/:levelId"
+          element={<PrivateRoute><LevelMenu totalLevels={5} /></PrivateRoute>}
+        />
+
+        <Route path="/game/:levelId" element={<ShadowMatchGame />} />
+
+        <Route path="/ai-chat" element={<PrivateRoute><AIChatPage /></PrivateRoute>} />
+        <Route path="/projects" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
+        <Route
+          path="/projects/create"
+          element={
+            <PrivateRoute allowedRoles={['student']}>
+              <CreateEditProjectPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/projects/edit/:projectId"
+          element={
+            <PrivateRoute allowedRoles={['student']}>
+              <CreateEditProjectPage />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/projects/:projectId" element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />
+        <Route path="/leaderboard" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute allowedRoles={['admin']}>
+              <div>Admin Dashboard Content</div>
+            </PrivateRoute>
+          }
+        />
+ <Route path="/modules" element={<PrivateRoute><ModulesPage /></PrivateRoute>} />
+        <Route path="/modules/:moduleId" element={<PrivateRoute><ModuleDetailPage /></PrivateRoute>} />
+        <Route path="/game/:moduleId/:contentPieceIndex" element={<PrivateRoute><GamePage /></PrivateRoute>} />
+        <Route
+          path="/newmodules"
+          element={
+            <PrivateRoute>
+              <ErrorBoundary>
+                <NewModulesPage />
+              </ErrorBoundary>
+            </PrivateRoute>
+          }
+        />
+
+        <Route path="/newmodule/:moduleId/video/:videoIndex" element={<VideoPage />} />
+        <Route path="/newmodule/:moduleId/quiz" element={<NewModuleQuizPage />} />
+<Route
+  path="/newmodule/:moduleId"
+  element={
+    <PrivateRoute>
+      <NewModuleDetailPage />
+    </PrivateRoute>
+  }
+/>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </SocketProvider>
@@ -113,4 +209,5 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => <AppContent />;
+
 export default App;
