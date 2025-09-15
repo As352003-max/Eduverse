@@ -40,7 +40,7 @@ const Navbar: React.FC = () => {
             {/* ✅ Brand */}
             <Link to={user ? "/dashboard" : "/"} className="text-2xl font-bold flex items-center gap-2">
                 <AcademicCapIcon className="h-8 w-8 text-white" />
-                Eduverse
+                MindSpring
             </Link>
 
             {/* ✅ Mobile Menu Button */}
