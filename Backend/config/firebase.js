@@ -10,7 +10,7 @@ try {
     console.log("✅ Firebase credentials loaded from Render ENV");
   } else {
     // ✅ Local fallback for development
-    serviceAccount = require("../config/serviceAccountKey.json");
+    // serviceAccount = require("../config/serviceAccountKey.json");
     console.log("✅ Firebase credentials loaded from local file");
   }
 
