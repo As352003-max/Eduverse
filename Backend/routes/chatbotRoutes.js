@@ -6,7 +6,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// POST: Send message to Gemini and get response
+// ---------------- POST: Send message to Gemini and get response ----------------
 router.post('/message', protect, async (req, res) => {
     const { message, sessionId } = req.body;
     const userId = req.user.id;
@@ -66,7 +66,7 @@ router.post('/message', protect, async (req, res) => {
     }
 });
 
-// GET: Fetch all chat sessions for the user
+// ---------------- GET: Fetch all chat sessions for the user ----------------
 router.get('/sessions', protect, async (req, res) => {
     const { title, dateFrom, dateTo } = req.query;
     const userId = req.user.id;
@@ -92,18 +92,15 @@ router.get('/sessions', protect, async (req, res) => {
     }
 });
 
-// ✅ FIXED GET /session/:sessionId (was giving 404)
+// ---------------- GET: Fetch a single chat session ----------------
 router.get('/session/:sessionId', protect, async (req, res) => {
     const { sessionId } = req.params;
     const userId = req.user.id;
 
     try {
-        console.log('🔍 Fetching session:', sessionId, 'for user:', userId);
-
         const session = await ChatSession.findOne({ _id: sessionId, userId });
 
         if (!session) {
-            console.warn('❌ Session not found or unauthorized access');
             return res.status(404).json({ message: 'Session not found or unauthorized.' });
         }
 
@@ -114,7 +111,7 @@ router.get('/session/:sessionId', protect, async (req, res) => {
     }
 });
 
-// POST: Create a new session
+// ---------------- POST: Create a new chat session ----------------
 router.post('/new-session', protect, async (req, res) => {
     const { title } = req.body;
     const userId = req.user.id;
@@ -134,7 +131,7 @@ router.post('/new-session', protect, async (req, res) => {
     }
 });
 
-// PUT: Rename a session
+// ---------------- PUT: Rename a chat session ----------------
 router.put('/session/:sessionId/rename', protect, async (req, res) => {
     const { sessionId } = req.params;
     const { title } = req.body;
@@ -154,7 +151,26 @@ router.put('/session/:sessionId/rename', protect, async (req, res) => {
         res.status(200).json({ message: 'Session renamed.', session });
     } catch (err) {
         console.error('❌ Error renaming session:', err.message);
-        res.status(500).json({ message: 'Failed to rename session.' });
+        res.status(500).json({ message: 'Failed to rename chat session.' });
+    }
+});
+
+// ---------------- DELETE: Delete a chat session ----------------
+router.delete('/session/:sessionId', protect, async (req, res) => {
+    const { sessionId } = req.params;
+    const userId = req.user.id;
+
+    try {
+        const session = await ChatSession.findOneAndDelete({ _id: sessionId, userId });
+
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found or unauthorized.' });
+        }
+
+        res.status(200).json({ message: 'Session deleted successfully.', sessionId });
+    } catch (err) {
+        console.error('❌ Error deleting session:', err.stack || err);
+        res.status(500).json({ message: 'Failed to delete chat session.' });
     }
 });
 
